@@ -81,6 +81,32 @@ zig_library(
 )
 
 genrule(
+    name = "matmul_coop_f16_opt_spv_gen",
+    srcs = ["//tools:emit_coop_spv.zig"],
+    outs = [
+        "matmul_coop_f16_opt.spv",
+        "matmul_coop_f16_opt_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- --mode=f16-opt "$(@D)/matmul_coop_f16_opt.spv" "$(@D)/matmul_coop_f16_opt_spv.zig"
+spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_f16_opt.spv"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_coop_f16_opt_spv_words",
+    import_name = "matmul_coop_f16_opt_spv",
+    main = ":matmul_coop_f16_opt_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
     name = "matmul_coop_bf16_spv_gen",
     srcs = ["//tools:emit_coop_spv.zig"],
     outs = [
@@ -107,5 +133,35 @@ zig_library(
     name = "matmul_coop_bf16_spv_words",
     import_name = "matmul_coop_bf16_spv",
     main = ":matmul_coop_bf16_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_coop_bf16_opt_spv_gen",
+    srcs = ["//tools:emit_coop_spv.zig"],
+    outs = [
+        "matmul_coop_bf16_opt.spv",
+        "matmul_coop_bf16_opt_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- --mode=bf16-opt "$(@D)/matmul_coop_bf16_opt.spv" "$(@D)/matmul_coop_bf16_opt_spv.zig"
+if spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_bf16_opt.spv"; then
+    :
+else
+    echo "warning: installed spirv-val does not recognize SPV_KHR_bfloat16 yet; generated BF16 opt SPIR-V was not validator-checked" >&2
+fi
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_coop_bf16_opt_spv_words",
+    import_name = "matmul_coop_bf16_opt_spv",
+    main = ":matmul_coop_bf16_opt_spv.zig",
     visibility = ["//visibility:public"],
 )

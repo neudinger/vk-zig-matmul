@@ -1,5 +1,7 @@
 const std = @import("std");
+const matmul_coop_bf16_opt_spv = @import("matmul_coop_bf16_opt_spv");
 const matmul_coop_bf16_spv = @import("matmul_coop_bf16_spv");
+const matmul_coop_f16_opt_spv = @import("matmul_coop_f16_opt_spv");
 const matmul_coop_f16_spv = @import("matmul_coop_f16_spv");
 const matmul_zig_spv = @import("matmul_zig_spv");
 const c = @import("vulkan_loader.zig").c;
@@ -123,6 +125,8 @@ const ShaderMode = enum {
     zig,
     coop_bf16,
     coop_f16,
+    coop_bf16_opt,
+    coop_f16_opt,
 
     fn isCoop(self: ShaderMode) bool {
         return self != .zig;
@@ -133,22 +137,47 @@ const ShaderMode = enum {
             .zig => "zig",
             .coop_bf16 => "coop",
             .coop_f16 => "coop-f16",
+            .coop_bf16_opt => "coop-opt",
+            .coop_f16_opt => "coop-f16-opt",
+        };
+    }
+
+    fn isBf16(self: ShaderMode) bool {
+        return switch (self) {
+            .coop_bf16, .coop_bf16_opt => true,
+            .zig, .coop_f16, .coop_f16_opt => false,
+        };
+    }
+
+    fn isF16(self: ShaderMode) bool {
+        return switch (self) {
+            .coop_f16, .coop_f16_opt => true,
+            .zig, .coop_bf16, .coop_bf16_opt => false,
         };
     }
 
     fn inputComponentType(self: ShaderMode) c.VkComponentTypeKHR {
         return switch (self) {
             .zig => c.VK_COMPONENT_TYPE_FLOAT32_KHR,
-            .coop_bf16 => c.VK_COMPONENT_TYPE_BFLOAT16_KHR,
-            .coop_f16 => c.VK_COMPONENT_TYPE_FLOAT16_KHR,
+            .coop_bf16, .coop_bf16_opt => c.VK_COMPONENT_TYPE_BFLOAT16_KHR,
+            .coop_f16, .coop_f16_opt => c.VK_COMPONENT_TYPE_FLOAT16_KHR,
         };
     }
 
-    fn tileN(self: ShaderMode) usize {
+    fn matrixTileN(self: ShaderMode) usize {
+        return switch (self) {
+            .zig => 16,
+            .coop_bf16, .coop_bf16_opt => 16,
+            .coop_f16, .coop_f16_opt => 8,
+        };
+    }
+
+    fn outputTileN(self: ShaderMode) usize {
         return switch (self) {
             .zig => 16,
             .coop_bf16 => 16,
             .coop_f16 => 8,
+            .coop_bf16_opt, .coop_f16_opt => 32,
         };
     }
 };
@@ -205,7 +234,7 @@ pub fn main(init: std.process.Init) !void {
     if (opts.m > std.math.maxInt(u32) or opts.n > std.math.maxInt(u32) or opts.k > std.math.maxInt(u32)) {
         return error.InvalidDimensions;
     }
-    if (opts.shader.isCoop()) try validateCoopDimensions(opts);
+    if (opts.shader.isCoop()) validateCoopDimensions(opts);
 
     var vk = try Vulkan.open();
     defer vk.close();
@@ -237,6 +266,10 @@ fn parseArgs(args: []const []const u8) !Options {
                 opts.shader = .coop_bf16;
             } else if (std.mem.eql(u8, value, "coop-f16")) {
                 opts.shader = .coop_f16;
+            } else if (std.mem.eql(u8, value, "coop-opt") or std.mem.eql(u8, value, "coop-bf16-opt")) {
+                opts.shader = .coop_bf16_opt;
+            } else if (std.mem.eql(u8, value, "coop-f16-opt")) {
+                opts.shader = .coop_f16_opt;
             } else {
                 log.err("unknown shader mode: {s}", .{value});
                 return error.InvalidShader;
@@ -409,11 +442,11 @@ fn findComputeQueueFamily(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
     return null;
 }
 
-fn validateCoopDimensions(opts: Options) !void {
-    const tile_n = opts.shader.tileN();
+fn validateCoopDimensions(opts: Options) void {
+    const tile_n = opts.shader.outputTileN();
     if (opts.m % 16 == 0 and opts.n % tile_n == 0 and opts.k % 16 == 0) return;
     log.err("--shader={s} requires m % 16 == 0, n % {d} == 0, and k % 16 == 0; use --shader=zig for arbitrary dimensions", .{ opts.shader.name(), tile_n });
-    return error.InvalidCoopDimensions;
+    std.process.exit(2);
 }
 
 fn requireDeviceExtensions(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice, shader: ShaderMode) !void {
@@ -429,7 +462,7 @@ fn requireDeviceExtensions(vk: *Vulkan, allocator: std.mem.Allocator, physical_d
         log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME });
         return error.RequiredDeviceExtensionMissing;
     }
-    if (shader == .coop_bf16 and !hasDeviceExtension(extensions, c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
+    if (shader.isBf16() and !hasDeviceExtension(extensions, c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
         log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME });
         return error.RequiredDeviceExtensionMissing;
     }
@@ -466,7 +499,7 @@ fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical
 
     const input_type = shader.inputComponentType();
     for (props[0..count]) |prop| {
-        if (prop.MSize == 16 and prop.NSize == @as(u32, @intCast(shader.tileN())) and prop.KSize == 16 and
+        if (prop.MSize == 16 and prop.NSize == @as(u32, @intCast(shader.matrixTileN())) and prop.KSize == 16 and
             prop.AType == input_type and prop.BType == input_type and
             prop.CType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
             prop.ResultType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
@@ -477,7 +510,7 @@ fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical
         }
     }
 
-    log.err("selected device lacks required {s} cooperative matrix property: M=16 N={d} K=16 A/B={d} C/Result=FLOAT32 scope=SUBGROUP", .{ shader.name(), shader.tileN(), input_type });
+    log.err("selected device lacks required {s} cooperative matrix property: M=16 N={d} K=16 A/B={d} C/Result=FLOAT32 scope=SUBGROUP", .{ shader.name(), shader.matrixTileN(), input_type });
     for (props[0..@min(count, 24)]) |prop| {
         log.err("  property: M={d} N={d} K={d} A={d} B={d} C={d} Result={d} sat={d} scope={d}", .{
             prop.MSize,
@@ -528,7 +561,7 @@ fn createDevice(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.Vk
         c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME,
     };
     if (shader.isCoop()) {
-        device_info.enabledExtensionCount = if (shader == .coop_bf16) 2 else 1;
+        device_info.enabledExtensionCount = if (shader.isBf16()) 2 else 1;
         device_info.ppEnabledExtensionNames = extensions[0..device_info.enabledExtensionCount].ptr;
     }
 
@@ -545,7 +578,7 @@ fn createDevice(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.Vk
         storage16_features.storageBuffer16BitAccess = c.VK_TRUE;
         storage16_features.pNext = &coop_features;
 
-        if (shader == .coop_f16) {
+        if (shader.isF16()) {
             f16_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
             f16_features.shaderFloat16 = c.VK_TRUE;
             f16_features.pNext = &storage16_features;
@@ -803,6 +836,8 @@ fn createShaderModule(device: *Device, shader: ShaderMode) !c.VkShaderModule {
         .zig => matmul_zig_spv.words[0..],
         .coop_bf16 => matmul_coop_bf16_spv.words[0..],
         .coop_f16 => matmul_coop_f16_spv.words[0..],
+        .coop_bf16_opt => matmul_coop_bf16_opt_spv.words[0..],
+        .coop_f16_opt => matmul_coop_f16_opt_spv.words[0..],
     };
 
     var info: c.VkShaderModuleCreateInfo = std.mem.zeroes(c.VkShaderModuleCreateInfo);
@@ -962,7 +997,7 @@ fn recordCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: 
     var sets = [_]c.VkDescriptorSet{descriptor_set};
     device.fns.cmdBindDescriptorSets(command_buffer, c.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, sets[0..].ptr, 0, null);
     device.fns.cmdPushConstants(command_buffer, pipeline_layout, c.VK_SHADER_STAGE_COMPUTE_BIT, 0, @sizeOf(PushConstants), &pc);
-    const dispatch_x: u32 = if (opts.shader.isCoop()) @intCast(opts.n / opts.shader.tileN()) else roundUpDiv(@intCast(opts.n), 16);
+    const dispatch_x: u32 = if (opts.shader.isCoop()) @intCast(opts.n / opts.shader.outputTileN()) else roundUpDiv(@intCast(opts.n), 16);
     const dispatch_y: u32 = if (opts.shader.isCoop()) @intCast(opts.m / 16) else roundUpDiv(@intCast(opts.m), 16);
     device.fns.cmdDispatch(command_buffer, dispatch_x, dispatch_y, 1);
 
@@ -1124,8 +1159,8 @@ fn validate(got: []const f32, a: []const f32, b: []const f32, m: usize, n: usize
 }
 
 fn validateEncoded(got: []const f32, opts: Options) !void {
-    const abs_tol: f32 = if (opts.shader == .coop_f16) 1e-2 else 2e-1;
-    const rel_tol: f32 = if (opts.shader == .coop_f16) 5e-3 else 2e-2;
+    const abs_tol: f32 = if (opts.shader.isF16()) 1e-2 else 2e-1;
+    const rel_tol: f32 = if (opts.shader.isF16()) 5e-3 else 2e-2;
     var expected_by_residue: [29][31]f32 = undefined;
     for (0..29) |row_residue| {
         for (0..31) |col_residue| {
@@ -1162,16 +1197,16 @@ fn inputBQuantized(row: usize, col: usize, shader: ShaderMode) f32 {
 
 fn encodeInput(value: f32, shader: ShaderMode) u16 {
     return switch (shader) {
-        .coop_f16 => f32ToF16Bits(value),
-        .coop_bf16 => f32ToBf16Bits(value),
+        .coop_f16, .coop_f16_opt => f32ToF16Bits(value),
+        .coop_bf16, .coop_bf16_opt => f32ToBf16Bits(value),
         .zig => unreachable,
     };
 }
 
 fn decodeInput(bits: u16, shader: ShaderMode) f32 {
     return switch (shader) {
-        .coop_f16 => f16BitsToF32(bits),
-        .coop_bf16 => bf16BitsToF32(bits),
+        .coop_f16, .coop_f16_opt => f16BitsToF32(bits),
+        .coop_bf16, .coop_bf16_opt => bf16BitsToF32(bits),
         .zig => unreachable,
     };
 }

@@ -47,7 +47,9 @@ bazel run //:vk_matmul -- --shader=zig --m=16 --n=17 --k=19
 bazel run //:vk_matmul -- --shader=zig --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --shader=coop-f16 --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --shader=coop --m=64 --n=64 --k=64
+bazel run //:vk_matmul -- --shader=coop-opt --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --shader=coop --m=1024 --n=1024 --k=1024
+bazel run //:vk_matmul -- --shader=coop-opt --m=1024 --n=1024 --k=1024
 ```
 
 Shader modes:
@@ -55,6 +57,8 @@ Shader modes:
 - `--shader=zig`: scalar f32 path.
 - `--shader=coop` / `--shader=coop-bf16`: BF16 inputs with f32 accumulation and output.
 - `--shader=coop-f16`: FP16 inputs with f32 accumulation and output.
+- `--shader=coop-opt` / `--shader=coop-bf16-opt`: BF16 optimized path, computing a 16x32 output tile per workgroup by reusing one A cooperative-matrix load across two N tiles.
+- `--shader=coop-f16-opt`: FP16 optimized path, computing a 16x32 output tile per workgroup by reusing one A cooperative-matrix load across four N tiles.
 - `--device=<index>`: select the Vulkan device index printed by `--list-devices`.
 - `--device-substr=<text>`: select the first non-CPU Vulkan device whose name contains the text.
 

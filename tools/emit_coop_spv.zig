@@ -3,28 +3,88 @@ const std = @import("std");
 const Mode = enum {
     bf16,
     f16,
+    bf16_opt,
+    f16_opt,
 
     fn importName(self: Mode) []const u8 {
         return switch (self) {
             .bf16 => "matmul_coop_bf16_spv",
             .f16 => "matmul_coop_f16_spv",
+            .bf16_opt => "matmul_coop_bf16_opt_spv",
+            .f16_opt => "matmul_coop_f16_opt_spv",
         };
     }
 
     fn componentLabel(self: Mode) []const u8 {
         return switch (self) {
-            .bf16 => "bf16",
-            .f16 => "f16",
+            .bf16, .bf16_opt => "bf16",
+            .f16, .f16_opt => "f16",
         };
     }
 
     fn tileN(self: Mode) u32 {
         return switch (self) {
-            .bf16 => 16,
-            .f16 => 8,
+            .bf16, .bf16_opt => 16,
+            .f16, .f16_opt => 8,
         };
     }
+
+    fn nTiles(self: Mode) u32 {
+        return switch (self) {
+            .bf16, .f16 => 1,
+            .bf16_opt => 2,
+            .f16_opt => 4,
+        };
+    }
+
+    fn outputTileN(self: Mode) u32 {
+        return self.tileN() * self.nTiles();
+    }
+
+    fn isF16(self: Mode) bool {
+        return switch (self) {
+            .f16, .f16_opt => true,
+            .bf16, .bf16_opt => false,
+        };
+    }
+
+    fn hasOptimizedNTiling(self: Mode) bool {
+        return self.nTiles() > 1;
+    }
 };
+
+const max_n_tiles = 4;
+
+fn modeFromArg(arg: []const u8) !Mode {
+    if (std.mem.eql(u8, arg, "--mode=bf16")) return .bf16;
+    if (std.mem.eql(u8, arg, "--mode=f16")) return .f16;
+    if (std.mem.eql(u8, arg, "--mode=bf16-opt")) return .bf16_opt;
+    if (std.mem.eql(u8, arg, "--mode=f16-opt")) return .f16_opt;
+    return error.InvalidMode;
+}
+
+fn constForU32(ids: Ids, value: u32) u32 {
+    return switch (value) {
+        0 => ids.u32_0,
+        1 => ids.u32_1,
+        2 => ids.u32_2,
+        3 => ids.u32_3,
+        8 => ids.u32_8,
+        16 => ids.u32_16,
+        24 => ids.u32_24,
+        32 => ids.u32_32,
+        else => unreachable,
+    };
+}
+
+fn addConstU32(builder: *Builder, ids: Ids, base: u32, value: u32) !u32 {
+    if (value == 0) return base;
+    return binary(builder, OpIAdd, ids.u32_ty, base, constForU32(ids, value));
+}
+
+fn u32IdForTileN(ids: Ids, value: u32) u32 {
+    return constForU32(ids, value);
+}
 
 const OpName: u16 = 5;
 const OpMemberName: u16 = 6;
@@ -109,12 +169,7 @@ pub fn main(init: std.process.Init) !void {
     defer gpa.free(args);
 
     if (args.len != 4) return error.InvalidArguments;
-    const mode = if (std.mem.eql(u8, args[1], "--mode=bf16"))
-        Mode.bf16
-    else if (std.mem.eql(u8, args[1], "--mode=f16"))
-        Mode.f16
-    else
-        return error.InvalidMode;
+    const mode = try modeFromArg(args[1]);
 
     var builder = Builder{};
     const words = try emitModule(&builder, mode);
@@ -149,6 +204,8 @@ const Ids = struct {
     u32_3: u32,
     u32_8: u32,
     u32_16: u32,
+    u32_24: u32,
+    u32_32: u32,
     i32_0: u32,
     i32_2: u32,
     i32_3: u32,
@@ -181,12 +238,12 @@ const Ids = struct {
     ptr_sb_struct_c: u32,
     pc_struct: u32,
 
-    acc_var: u32,
+    acc_vars: [max_n_tiles]u32,
     kk_var: u32,
 };
 
 const Builder = struct {
-    words: [2048]u32 = undefined,
+    words: [4096]u32 = undefined,
     len: usize = 0,
     bound: u32 = 1,
 
@@ -254,6 +311,8 @@ const Builder = struct {
             .u32_3 = self.nextId(),
             .u32_8 = self.nextId(),
             .u32_16 = self.nextId(),
+            .u32_24 = self.nextId(),
+            .u32_32 = self.nextId(),
             .i32_0 = self.nextId(),
             .i32_2 = self.nextId(),
             .i32_3 = self.nextId(),
@@ -286,7 +345,7 @@ const Builder = struct {
             .ptr_sb_struct_c = self.nextId(),
             .pc_struct = self.nextId(),
 
-            .acc_var = self.nextId(),
+            .acc_vars = .{ self.nextId(), self.nextId(), self.nextId(), self.nextId() },
             .kk_var = self.nextId(),
         };
     }
@@ -324,13 +383,12 @@ fn emitCapabilities(builder: *Builder, mode: Mode) !void {
     try builder.emit(OpCapability, &.{CapabilityStorageBuffer16BitAccess});
     try builder.emit(OpCapability, &.{CapabilityVulkanMemoryModel});
     try builder.emit(OpCapability, &.{CapabilityCooperativeMatrixKHR});
-    switch (mode) {
-        .f16 => try builder.emit(OpCapability, &.{CapabilityFloat16}),
-        .bf16 => {
-            try builder.emit(OpCapability, &.{CapabilityBFloat16TypeKHR});
-            try builder.emit(OpCapability, &.{CapabilityBFloat16CooperativeMatrixKHR});
-            try builder.emitString(OpExtension, &.{}, "SPV_KHR_bfloat16", &.{});
-        },
+    if (mode.isF16()) {
+        try builder.emit(OpCapability, &.{CapabilityFloat16});
+    } else {
+        try builder.emit(OpCapability, &.{CapabilityBFloat16TypeKHR});
+        try builder.emit(OpCapability, &.{CapabilityBFloat16CooperativeMatrixKHR});
+        try builder.emitString(OpExtension, &.{}, "SPV_KHR_bfloat16", &.{});
     }
     try builder.emitString(OpExtension, &.{}, "SPV_KHR_cooperative_matrix", &.{});
     try builder.emit(OpMemoryModel, &.{ AddressingModelLogical, MemoryModelVulkan });
@@ -362,6 +420,7 @@ fn emitNames(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emitString(OpMemberName, &.{ ids.struct_c, 0 }, "data", &.{});
     try builder.emitString(OpName, &.{ids.pc_struct}, "PushConstants", &.{});
     try builder.emitString(OpName, &.{ids.in_ty}, mode.componentLabel(), &.{});
+    if (mode.hasOptimizedNTiling()) try builder.emitString(OpName, &.{ids.acc_vars[0]}, "acc0", &.{});
 }
 
 fn emitDecorations(builder: *Builder, ids: Ids) !void {
@@ -399,16 +458,17 @@ fn emitDecorations(builder: *Builder, ids: Ids) !void {
 }
 
 fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
-    const tile_n = if (mode.tileN() == 16) ids.u32_16 else ids.u32_8;
+    const tile_n = u32IdForTileN(ids, mode.tileN());
 
     try builder.emit(OpTypeVoid, &.{ids.void_ty});
     try builder.emit(OpTypeBool, &.{ids.bool_ty});
     try builder.emit(OpTypeInt, &.{ ids.u32_ty, 32, 0 });
     try builder.emit(OpTypeInt, &.{ ids.i32_ty, 32, 1 });
     try builder.emit(OpTypeFloat, &.{ ids.f32_ty, 32 });
-    switch (mode) {
-        .f16 => try builder.emit(OpTypeFloat, &.{ ids.in_ty, 16 }),
-        .bf16 => try builder.emit(OpTypeFloat, &.{ ids.in_ty, 16, BFloat16EncodingKHR }),
+    if (mode.isF16()) {
+        try builder.emit(OpTypeFloat, &.{ ids.in_ty, 16 });
+    } else {
+        try builder.emit(OpTypeFloat, &.{ ids.in_ty, 16, BFloat16EncodingKHR });
     }
     try builder.emit(OpTypeVector, &.{ ids.vec3_u32_ty, ids.u32_ty, 3 });
     try builder.emit(OpTypeFunction, &.{ ids.fn_void_ty, ids.void_ty });
@@ -419,6 +479,8 @@ fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_3, 3 });
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_8, 8 });
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_16, 16 });
+    try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_24, 24 });
+    try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_32, 32 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_0, 0 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_2, 2 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_3, 3 });
@@ -460,12 +522,17 @@ fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
 }
 
 fn emitFunction(builder: *Builder, ids: Ids, mode: Mode) !void {
-    const tile_n = if (mode.tileN() == 16) ids.u32_16 else ids.u32_8;
+    const output_tile_n = mode.outputTileN();
+    const output_tile_n_id = u32IdForTileN(ids, output_tile_n);
+    const n_tiles: usize = @intCast(mode.nTiles());
 
     try builder.emit(OpFunction, &.{ ids.void_ty, ids.main, FunctionControlNone, ids.fn_void_ty });
     const entry_label = builder.nextId();
     try builder.emit(OpLabel, &.{entry_label});
-    try builder.emit(OpVariable, &.{ ids.ptr_fn_acc, ids.acc_var, StorageClassFunction });
+    var init_tile_i: usize = 0;
+    while (init_tile_i < n_tiles) : (init_tile_i += 1) {
+        try builder.emit(OpVariable, &.{ ids.ptr_fn_acc, ids.acc_vars[init_tile_i], StorageClassFunction });
+    }
     try builder.emit(OpVariable, &.{ ids.ptr_fn_u32, ids.kk_var, StorageClassFunction });
 
     const wg_x_ptr = try accessChain(builder, ids.ptr_input_u32, ids.wg, &.{ids.u32_0});
@@ -473,9 +540,12 @@ fn emitFunction(builder: *Builder, ids: Ids, mode: Mode) !void {
     const wg_y_ptr = try accessChain(builder, ids.ptr_input_u32, ids.wg, &.{ids.u32_1});
     const tile_row = try load(builder, ids.u32_ty, wg_y_ptr);
     const row = try binary(builder, OpIMul, ids.u32_ty, tile_row, ids.u32_16);
-    const col = try binary(builder, OpIMul, ids.u32_ty, tile_col, tile_n);
+    const col = try binary(builder, OpIMul, ids.u32_ty, tile_col, output_tile_n_id);
 
-    try builder.emit(OpStore, &.{ ids.acc_var, ids.acc_zero });
+    var zero_tile_i: usize = 0;
+    while (zero_tile_i < n_tiles) : (zero_tile_i += 1) {
+        try builder.emit(OpStore, &.{ ids.acc_vars[zero_tile_i], ids.acc_zero });
+    }
     try builder.emit(OpStore, &.{ ids.kk_var, ids.u32_0 });
 
     const loop_header = builder.nextId();
@@ -505,15 +575,20 @@ fn emitFunction(builder: *Builder, ids: Ids, mode: Mode) !void {
     const a_ptr = try accessChain(builder, ids.ptr_sb_in, ids.a_var, &.{ ids.i32_0, a_offset });
     const a_mat = try coopLoad(builder, ids.a_ty, a_ptr, a_stride, ids.i32_0);
 
-    const b_row_base = try binary(builder, OpIMul, ids.u32_ty, kk, b_stride);
-    const b_offset = try binary(builder, OpIAdd, ids.u32_ty, b_row_base, col);
-    const b_ptr = try accessChain(builder, ids.ptr_sb_in, ids.b_var, &.{ ids.i32_0, b_offset });
-    const b_mat = try coopLoad(builder, ids.b_ty, b_ptr, b_stride, ids.i32_0);
+    var body_tile_i: usize = 0;
+    while (body_tile_i < n_tiles) : (body_tile_i += 1) {
+        const n_offset = mode.tileN() * @as(u32, @intCast(body_tile_i));
+        const tile_col_value = try addConstU32(builder, ids, col, n_offset);
+        const b_row_base = try binary(builder, OpIMul, ids.u32_ty, kk, b_stride);
+        const b_offset = try binary(builder, OpIAdd, ids.u32_ty, b_row_base, tile_col_value);
+        const b_ptr = try accessChain(builder, ids.ptr_sb_in, ids.b_var, &.{ ids.i32_0, b_offset });
+        const b_mat = try coopLoad(builder, ids.b_ty, b_ptr, b_stride, ids.i32_0);
 
-    const acc_in = try load(builder, ids.acc_ty, ids.acc_var);
-    const acc_out = builder.nextId();
-    try builder.emit(OpCooperativeMatrixMulAddKHR, &.{ ids.acc_ty, acc_out, a_mat, b_mat, acc_in });
-    try builder.emit(OpStore, &.{ ids.acc_var, acc_out });
+        const acc_in = try load(builder, ids.acc_ty, ids.acc_vars[body_tile_i]);
+        const acc_out = builder.nextId();
+        try builder.emit(OpCooperativeMatrixMulAddKHR, &.{ ids.acc_ty, acc_out, a_mat, b_mat, acc_in });
+        try builder.emit(OpStore, &.{ ids.acc_vars[body_tile_i], acc_out });
+    }
     try builder.emit(OpBranch, &.{loop_continue});
 
     try builder.emit(OpLabel, &.{loop_continue});
@@ -523,12 +598,17 @@ fn emitFunction(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpBranch, &.{loop_header});
 
     try builder.emit(OpLabel, &.{loop_merge});
-    const acc_final = try load(builder, ids.acc_ty, ids.acc_var);
     const c_stride = try loadPush(builder, ids, ids.i32_5);
     const c_row_base = try binary(builder, OpIMul, ids.u32_ty, row, c_stride);
-    const c_offset = try binary(builder, OpIAdd, ids.u32_ty, c_row_base, col);
-    const c_ptr = try accessChain(builder, ids.ptr_sb_f32, ids.c_var, &.{ ids.i32_0, c_offset });
-    try builder.emit(OpCooperativeMatrixStoreKHR, &.{ c_ptr, acc_final, ids.i32_0, c_stride, MemoryAccessNone });
+    var store_tile_i: usize = 0;
+    while (store_tile_i < n_tiles) : (store_tile_i += 1) {
+        const n_offset = mode.tileN() * @as(u32, @intCast(store_tile_i));
+        const tile_col_value = try addConstU32(builder, ids, col, n_offset);
+        const acc_final = try load(builder, ids.acc_ty, ids.acc_vars[store_tile_i]);
+        const c_offset = try binary(builder, OpIAdd, ids.u32_ty, c_row_base, tile_col_value);
+        const c_ptr = try accessChain(builder, ids.ptr_sb_f32, ids.c_var, &.{ ids.i32_0, c_offset });
+        try builder.emit(OpCooperativeMatrixStoreKHR, &.{ c_ptr, acc_final, ids.i32_0, c_stride, MemoryAccessNone });
+    }
     try builder.emit(OpReturn, &.{});
     try builder.emit(OpFunctionEnd, &.{});
 }

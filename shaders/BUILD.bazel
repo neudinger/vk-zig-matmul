@@ -165,3 +165,59 @@ zig_library(
     main = ":matmul_coop_bf16_opt_spv.zig",
     visibility = ["//visibility:public"],
 )
+
+genrule(
+    name = "matmul_nvcoop2_f16_spv_gen",
+    srcs = ["//tools:emit_nvcoop2_spv.zig"],
+    outs = [
+        "matmul_nvcoop2_f16.spv",
+        "matmul_nvcoop2_f16_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- --mode=f16 "$(@D)/matmul_nvcoop2_f16.spv" "$(@D)/matmul_nvcoop2_f16_spv.zig"
+spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_f16.spv"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_f16_spv_words",
+    import_name = "matmul_nvcoop2_f16_spv",
+    main = ":matmul_nvcoop2_f16_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_nvcoop2_bf16_spv_gen",
+    srcs = ["//tools:emit_nvcoop2_spv.zig"],
+    outs = [
+        "matmul_nvcoop2_bf16.spv",
+        "matmul_nvcoop2_bf16_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- --mode=bf16 "$(@D)/matmul_nvcoop2_bf16.spv" "$(@D)/matmul_nvcoop2_bf16_spv.zig"
+if spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_bf16.spv"; then
+    :
+else
+    echo "warning: installed spirv-val does not recognize SPV_KHR_bfloat16 yet; generated NV BF16 SPIR-V was not validator-checked" >&2
+fi
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_bf16_spv_words",
+    import_name = "matmul_nvcoop2_bf16_spv",
+    main = ":matmul_nvcoop2_bf16_spv.zig",
+    visibility = ["//visibility:public"],
+)

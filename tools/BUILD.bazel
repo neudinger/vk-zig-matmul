@@ -1,4 +1,5 @@
 exports_files([
     "emit_coop_spv.zig",
+    "emit_nvcoop2_spv.zig",
     "patch_spv.zig",
 ])

@@ -21,6 +21,8 @@ pub const c = struct {
     pub const VkAccessFlags = VkFlags;
     pub const VkDependencyFlags = VkFlags;
     pub const VkPipelineStageFlags = VkFlags;
+    pub const VkQueryPoolCreateFlags = VkFlags;
+    pub const VkQueryResultFlags = VkFlags;
 
     pub const VkResult = i32;
     pub const VkStructureType = u32;
@@ -31,6 +33,7 @@ pub const c = struct {
     pub const VkCommandBufferLevel = u32;
     pub const VkComponentTypeKHR = u32;
     pub const VkScopeKHR = u32;
+    pub const VkQueryType = u32;
 
     const VkInstance_T = opaque {};
     const VkPhysicalDevice_T = opaque {};
@@ -48,6 +51,7 @@ pub const c = struct {
     const VkCommandPool_T = opaque {};
     const VkCommandBuffer_T = opaque {};
     const VkFence_T = opaque {};
+    const VkQueryPool_T = opaque {};
 
     pub const VkInstance = ?*VkInstance_T;
     pub const VkPhysicalDevice = ?*VkPhysicalDevice_T;
@@ -65,6 +69,7 @@ pub const c = struct {
     pub const VkCommandPool = ?*VkCommandPool_T;
     pub const VkCommandBuffer = ?*VkCommandBuffer_T;
     pub const VkFence = ?*VkFence_T;
+    pub const VkQueryPool = ?*VkQueryPool_T;
 
     pub const PFN_vkVoidFunction = ?*const fn () callconv(.c) void;
 
@@ -74,6 +79,7 @@ pub const c = struct {
     pub const VK_TRUE: VkBool32 = 1;
     pub const VK_FALSE: VkBool32 = 0;
     pub const VK_API_VERSION_1_2: u32 = (1 << 22) | (2 << 12);
+    pub const VK_API_VERSION_1_4: u32 = (1 << 22) | (4 << 12);
     pub const VK_PHYSICAL_DEVICE_TYPE_CPU: VkPhysicalDeviceType = 4;
 
     pub const VK_STRUCTURE_TYPE_APPLICATION_INFO: VkStructureType = 0;
@@ -83,6 +89,7 @@ pub const c = struct {
     pub const VK_STRUCTURE_TYPE_SUBMIT_INFO: VkStructureType = 4;
     pub const VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO: VkStructureType = 5;
     pub const VK_STRUCTURE_TYPE_FENCE_CREATE_INFO: VkStructureType = 8;
+    pub const VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO: VkStructureType = 11;
     pub const VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO: VkStructureType = 12;
     pub const VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO: VkStructureType = 16;
     pub const VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO: VkStructureType = 18;
@@ -96,9 +103,14 @@ pub const c = struct {
     pub const VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO: VkStructureType = 40;
     pub const VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO: VkStructureType = 42;
     pub const VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER: VkStructureType = 44;
+    pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2: VkStructureType = 1000059000;
+    pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2: VkStructureType = 1000059001;
     pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES: VkStructureType = 1000082000;
     pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES: VkStructureType = 1000083000;
     pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_BFLOAT16_FEATURES_KHR: VkStructureType = 1000141000;
+    pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV: VkStructureType = 1000593000;
+    pub const VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_FLEXIBLE_DIMENSIONS_PROPERTIES_NV: VkStructureType = 1000593001;
+    pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_PROPERTIES_NV: VkStructureType = 1000593002;
     pub const VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR: VkStructureType = 1000506000;
     pub const VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR: VkStructureType = 1000506001;
 
@@ -120,15 +132,22 @@ pub const c = struct {
     pub const VK_ACCESS_SHADER_WRITE_BIT: VkAccessFlags = 0x00000040;
     pub const VK_PIPELINE_STAGE_TRANSFER_BIT: VkPipelineStageFlags = 0x00001000;
     pub const VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT: VkPipelineStageFlags = 0x00000800;
+    pub const VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT: VkPipelineStageFlags = 0x00000001;
+    pub const VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT: VkPipelineStageFlags = 0x00002000;
     pub const VK_QUEUE_FAMILY_IGNORED: u32 = 0xffffffff;
+    pub const VK_QUERY_TYPE_TIMESTAMP: VkQueryType = 2;
+    pub const VK_QUERY_RESULT_64_BIT: VkQueryResultFlags = 0x00000001;
+    pub const VK_QUERY_RESULT_WAIT_BIT: VkQueryResultFlags = 0x00000002;
 
     pub const VK_COMPONENT_TYPE_FLOAT16_KHR: VkComponentTypeKHR = 0;
     pub const VK_COMPONENT_TYPE_FLOAT32_KHR: VkComponentTypeKHR = 1;
     pub const VK_COMPONENT_TYPE_BFLOAT16_KHR: VkComponentTypeKHR = 1000141000;
+    pub const VK_SCOPE_WORKGROUP_KHR: VkScopeKHR = 2;
     pub const VK_SCOPE_SUBGROUP_KHR: VkScopeKHR = 3;
 
     pub const VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME = "VK_KHR_cooperative_matrix";
     pub const VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME = "VK_KHR_shader_bfloat16";
+    pub const VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME = "VK_NV_cooperative_matrix2";
 
     pub fn VK_MAKE_VERSION(major: u32, minor: u32, patch: u32) u32 {
         return (major << 22) | (minor << 12) | patch;
@@ -173,6 +192,18 @@ pub const c = struct {
         bytes: [4096]u8,
     };
 
+    pub const VkPhysicalDeviceFeatures2 = extern struct {
+        sType: VkStructureType,
+        pNext: ?*anyopaque,
+        features: [220]u8,
+    };
+
+    pub const VkPhysicalDeviceProperties2 = extern struct {
+        sType: VkStructureType,
+        pNext: ?*anyopaque,
+        properties: VkPhysicalDeviceProperties,
+    };
+
     pub const VkExtensionProperties = extern struct {
         extensionName: [256]u8,
         specVersion: u32,
@@ -209,6 +240,26 @@ pub const c = struct {
         cooperativeMatrixRobustBufferAccess: VkBool32,
     };
 
+    pub const VkPhysicalDeviceCooperativeMatrix2FeaturesNV = extern struct {
+        sType: VkStructureType,
+        pNext: ?*anyopaque,
+        cooperativeMatrixWorkgroupScope: VkBool32,
+        cooperativeMatrixFlexibleDimensions: VkBool32,
+        cooperativeMatrixReductions: VkBool32,
+        cooperativeMatrixConversions: VkBool32,
+        cooperativeMatrixPerElementOperations: VkBool32,
+        cooperativeMatrixTensorAddressing: VkBool32,
+        cooperativeMatrixBlockLoads: VkBool32,
+    };
+
+    pub const VkPhysicalDeviceCooperativeMatrix2PropertiesNV = extern struct {
+        sType: VkStructureType,
+        pNext: ?*anyopaque,
+        cooperativeMatrixWorkgroupScopeMaxWorkgroupSize: u32,
+        cooperativeMatrixFlexibleDimensionsMaxDimension: u32,
+        cooperativeMatrixWorkgroupScopeReservedSharedMemory: u32,
+    };
+
     pub const VkCooperativeMatrixPropertiesKHR = extern struct {
         sType: VkStructureType,
         pNext: ?*anyopaque,
@@ -221,6 +272,21 @@ pub const c = struct {
         ResultType: VkComponentTypeKHR,
         saturatingAccumulation: VkBool32,
         scope: VkScopeKHR,
+    };
+
+    pub const VkCooperativeMatrixFlexibleDimensionsPropertiesNV = extern struct {
+        sType: VkStructureType,
+        pNext: ?*anyopaque,
+        MGranularity: u32,
+        NGranularity: u32,
+        KGranularity: u32,
+        AType: VkComponentTypeKHR,
+        BType: VkComponentTypeKHR,
+        CType: VkComponentTypeKHR,
+        ResultType: VkComponentTypeKHR,
+        saturatingAccumulation: VkBool32,
+        scope: VkScopeKHR,
+        workgroupInvocations: u32,
     };
 
     pub const VkMemoryType = extern struct {
@@ -444,6 +510,15 @@ pub const c = struct {
         sType: VkStructureType,
         pNext: ?*const anyopaque,
         flags: VkFenceCreateFlags,
+    };
+
+    pub const VkQueryPoolCreateInfo = extern struct {
+        sType: VkStructureType,
+        pNext: ?*const anyopaque,
+        flags: VkQueryPoolCreateFlags,
+        queryType: VkQueryType,
+        queryCount: u32,
+        pipelineStatistics: VkFlags,
     };
 
     pub const VkSubmitInfo = extern struct {

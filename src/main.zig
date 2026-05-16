@@ -3,6 +3,8 @@ const matmul_coop_bf16_opt_spv = @import("matmul_coop_bf16_opt_spv");
 const matmul_coop_bf16_spv = @import("matmul_coop_bf16_spv");
 const matmul_coop_f16_opt_spv = @import("matmul_coop_f16_opt_spv");
 const matmul_coop_f16_spv = @import("matmul_coop_f16_spv");
+const matmul_nvcoop2_bf16_spv = @import("matmul_nvcoop2_bf16_spv");
+const matmul_nvcoop2_f16_spv = @import("matmul_nvcoop2_f16_spv");
 const matmul_zig_spv = @import("matmul_zig_spv");
 const c = @import("vulkan_loader.zig").c;
 
@@ -22,10 +24,13 @@ const VkCreateInstance = *const fn (*const c.VkInstanceCreateInfo, ?*const c.VkA
 const VkDestroyInstance = *const fn (c.VkInstance, ?*const c.VkAllocationCallbacks) callconv(.c) void;
 const VkEnumeratePhysicalDevices = *const fn (c.VkInstance, *u32, ?[*]c.VkPhysicalDevice) callconv(.c) c.VkResult;
 const VkGetPhysicalDeviceProperties = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceProperties) callconv(.c) void;
+const VkGetPhysicalDeviceFeatures2 = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceFeatures2) callconv(.c) void;
+const VkGetPhysicalDeviceProperties2 = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceProperties2) callconv(.c) void;
 const VkGetPhysicalDeviceMemoryProperties = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceMemoryProperties) callconv(.c) void;
 const VkGetPhysicalDeviceQueueFamilyProperties = *const fn (c.VkPhysicalDevice, *u32, ?[*]c.VkQueueFamilyProperties) callconv(.c) void;
 const VkEnumerateDeviceExtensionProperties = *const fn (c.VkPhysicalDevice, ?[*:0]const u8, *u32, ?[*]c.VkExtensionProperties) callconv(.c) c.VkResult;
 const VkGetPhysicalDeviceCooperativeMatrixPropertiesKHR = *const fn (c.VkPhysicalDevice, *u32, ?[*]c.VkCooperativeMatrixPropertiesKHR) callconv(.c) c.VkResult;
+const VkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV = *const fn (c.VkPhysicalDevice, *u32, ?[*]c.VkCooperativeMatrixFlexibleDimensionsPropertiesNV) callconv(.c) c.VkResult;
 const VkCreateDevice = *const fn (c.VkPhysicalDevice, *const c.VkDeviceCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkDevice) callconv(.c) c.VkResult;
 const VkDestroyDevice = *const fn (c.VkDevice, ?*const c.VkAllocationCallbacks) callconv(.c) void;
 const VkGetDeviceQueue = *const fn (c.VkDevice, u32, u32, *c.VkQueue) callconv(.c) void;
@@ -62,6 +67,11 @@ const VkCmdPipelineBarrier = *const fn (c.VkCommandBuffer, c.VkPipelineStageFlag
 const VkCmdDispatch = *const fn (c.VkCommandBuffer, u32, u32, u32) callconv(.c) void;
 const VkCreateFence = *const fn (c.VkDevice, *const c.VkFenceCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkFence) callconv(.c) c.VkResult;
 const VkDestroyFence = *const fn (c.VkDevice, c.VkFence, ?*const c.VkAllocationCallbacks) callconv(.c) void;
+const VkCreateQueryPool = *const fn (c.VkDevice, *const c.VkQueryPoolCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkQueryPool) callconv(.c) c.VkResult;
+const VkDestroyQueryPool = *const fn (c.VkDevice, c.VkQueryPool, ?*const c.VkAllocationCallbacks) callconv(.c) void;
+const VkGetQueryPoolResults = *const fn (c.VkDevice, c.VkQueryPool, u32, u32, usize, *anyopaque, c.VkDeviceSize, c.VkQueryResultFlags) callconv(.c) c.VkResult;
+const VkCmdResetQueryPool = *const fn (c.VkCommandBuffer, c.VkQueryPool, u32, u32) callconv(.c) void;
+const VkCmdWriteTimestamp = *const fn (c.VkCommandBuffer, c.VkPipelineStageFlags, c.VkQueryPool, u32) callconv(.c) void;
 const VkQueueSubmit = *const fn (c.VkQueue, u32, [*]const c.VkSubmitInfo, c.VkFence) callconv(.c) c.VkResult;
 const VkWaitForFences = *const fn (c.VkDevice, u32, [*]const c.VkFence, c.VkBool32, u64) callconv(.c) c.VkResult;
 const VkResetFences = *const fn (c.VkDevice, u32, [*]const c.VkFence) callconv(.c) c.VkResult;
@@ -71,10 +81,13 @@ const InstanceFns = struct {
     destroyInstance: VkDestroyInstance,
     enumeratePhysicalDevices: VkEnumeratePhysicalDevices,
     getPhysicalDeviceProperties: VkGetPhysicalDeviceProperties,
+    getPhysicalDeviceFeatures2: VkGetPhysicalDeviceFeatures2,
+    getPhysicalDeviceProperties2: VkGetPhysicalDeviceProperties2,
     getPhysicalDeviceMemoryProperties: VkGetPhysicalDeviceMemoryProperties,
     getPhysicalDeviceQueueFamilyProperties: VkGetPhysicalDeviceQueueFamilyProperties,
     enumerateDeviceExtensionProperties: VkEnumerateDeviceExtensionProperties,
     getCooperativeMatrixPropertiesKHR: ?VkGetPhysicalDeviceCooperativeMatrixPropertiesKHR,
+    getCooperativeMatrixFlexibleDimensionsPropertiesNV: ?VkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV,
     createDevice: VkCreateDevice,
     getDeviceProcAddr: VkGetDeviceProcAddr,
 };
@@ -115,6 +128,11 @@ const DeviceFns = struct {
     cmdDispatch: VkCmdDispatch,
     createFence: VkCreateFence,
     destroyFence: VkDestroyFence,
+    createQueryPool: VkCreateQueryPool,
+    destroyQueryPool: VkDestroyQueryPool,
+    getQueryPoolResults: VkGetQueryPoolResults,
+    cmdResetQueryPool: VkCmdResetQueryPool,
+    cmdWriteTimestamp: VkCmdWriteTimestamp,
     queueSubmit: VkQueueSubmit,
     waitForFences: VkWaitForFences,
     resetFences: VkResetFences,
@@ -127,9 +145,18 @@ const ShaderMode = enum {
     coop_f16,
     coop_bf16_opt,
     coop_f16_opt,
+    nvcoop2_bf16,
+    nvcoop2_f16,
 
     fn isCoop(self: ShaderMode) bool {
         return self != .zig;
+    }
+
+    fn isNvCoop2(self: ShaderMode) bool {
+        return switch (self) {
+            .nvcoop2_bf16, .nvcoop2_f16 => true,
+            .zig, .coop_bf16, .coop_f16, .coop_bf16_opt, .coop_f16_opt => false,
+        };
     }
 
     fn name(self: ShaderMode) []const u8 {
@@ -139,28 +166,30 @@ const ShaderMode = enum {
             .coop_f16 => "coop-f16",
             .coop_bf16_opt => "coop-opt",
             .coop_f16_opt => "coop-f16-opt",
+            .nvcoop2_bf16 => "nvcoop2",
+            .nvcoop2_f16 => "nvcoop2-f16",
         };
     }
 
     fn isBf16(self: ShaderMode) bool {
         return switch (self) {
-            .coop_bf16, .coop_bf16_opt => true,
-            .zig, .coop_f16, .coop_f16_opt => false,
+            .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => true,
+            .zig, .coop_f16, .coop_f16_opt, .nvcoop2_f16 => false,
         };
     }
 
     fn isF16(self: ShaderMode) bool {
         return switch (self) {
-            .coop_f16, .coop_f16_opt => true,
-            .zig, .coop_bf16, .coop_bf16_opt => false,
+            .coop_f16, .coop_f16_opt, .nvcoop2_f16 => true,
+            .zig, .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => false,
         };
     }
 
     fn inputComponentType(self: ShaderMode) c.VkComponentTypeKHR {
         return switch (self) {
             .zig => c.VK_COMPONENT_TYPE_FLOAT32_KHR,
-            .coop_bf16, .coop_bf16_opt => c.VK_COMPONENT_TYPE_BFLOAT16_KHR,
-            .coop_f16, .coop_f16_opt => c.VK_COMPONENT_TYPE_FLOAT16_KHR,
+            .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => c.VK_COMPONENT_TYPE_BFLOAT16_KHR,
+            .coop_f16, .coop_f16_opt, .nvcoop2_f16 => c.VK_COMPONENT_TYPE_FLOAT16_KHR,
         };
     }
 
@@ -169,6 +198,14 @@ const ShaderMode = enum {
             .zig => 16,
             .coop_bf16, .coop_bf16_opt => 16,
             .coop_f16, .coop_f16_opt => 8,
+            .nvcoop2_bf16, .nvcoop2_f16 => 64,
+        };
+    }
+
+    fn outputTileM(self: ShaderMode) usize {
+        return switch (self) {
+            .zig, .coop_bf16, .coop_f16, .coop_bf16_opt, .coop_f16_opt => 16,
+            .nvcoop2_bf16, .nvcoop2_f16 => 64,
         };
     }
 
@@ -178,8 +215,14 @@ const ShaderMode = enum {
             .coop_bf16 => 16,
             .coop_f16 => 8,
             .coop_bf16_opt, .coop_f16_opt => 32,
+            .nvcoop2_bf16, .nvcoop2_f16 => 64,
         };
     }
+};
+
+const TimingMode = enum {
+    gpu_timestamp,
+    submit_cpu,
 };
 
 const Options = struct {
@@ -189,9 +232,16 @@ const Options = struct {
     k: usize = 64,
     iters: usize = 50,
     warmup: usize = 5,
+    timing: TimingMode = .gpu_timestamp,
     list_devices: bool = false,
     device_index: ?usize = null,
     device_substr: ?[]const u8 = null,
+};
+
+const TimingResult = struct {
+    avg_ns: f64,
+    avg_gpu_ns: ?f64 = null,
+    avg_batch_cpu_ns: ?f64 = null,
 };
 
 const PushConstants = extern struct {
@@ -245,9 +295,22 @@ pub fn main(init: std.process.Init) !void {
     const selected = try selectPhysicalDevice(&vk, allocator, instance, opts.device_index, opts.device_substr, opts.list_devices);
     if (opts.list_devices) return;
 
-    if (opts.shader.isCoop()) try requireCoopMatrixProperty(&vk, allocator, selected.physical_device, opts.shader);
+    if (opts.shader.isCoop()) {
+        requireCoopMatrixProperty(&vk, allocator, selected.physical_device, opts.shader) catch |err| switch (err) {
+            error.RequiredDeviceExtensionMissing,
+            error.RequiredDeviceFeatureMissing,
+            error.RequiredCoopMatrixPropertyMissing,
+            => std.process.exit(2),
+            else => return err,
+        };
+    }
 
-    var device = try createDevice(&vk, allocator, selected.physical_device, selected.queue_family, opts.shader);
+    var device = createDevice(&vk, allocator, selected.physical_device, selected.queue_family, opts.shader) catch |err| switch (err) {
+        error.RequiredDeviceExtensionMissing,
+        error.RequiredDeviceFeatureMissing,
+        => std.process.exit(2),
+        else => return err,
+    };
     defer device.deinit();
 
     try runMatmul(&vk, &device, opts);
@@ -270,6 +333,10 @@ fn parseArgs(args: []const []const u8) !Options {
                 opts.shader = .coop_bf16_opt;
             } else if (std.mem.eql(u8, value, "coop-f16-opt")) {
                 opts.shader = .coop_f16_opt;
+            } else if (std.mem.eql(u8, value, "nvcoop2") or std.mem.eql(u8, value, "nvcoop2-bf16")) {
+                opts.shader = .nvcoop2_bf16;
+            } else if (std.mem.eql(u8, value, "nvcoop2-f16")) {
+                opts.shader = .nvcoop2_f16;
             } else {
                 log.err("unknown shader mode: {s}", .{value});
                 return error.InvalidShader;
@@ -284,6 +351,16 @@ fn parseArgs(args: []const []const u8) !Options {
             opts.iters = try std.fmt.parseInt(usize, arg["--iters=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--warmup=")) {
             opts.warmup = try std.fmt.parseInt(usize, arg["--warmup=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--timing=")) {
+            const value = arg["--timing=".len..];
+            if (std.mem.eql(u8, value, "gpu") or std.mem.eql(u8, value, "gpu-timestamp")) {
+                opts.timing = .gpu_timestamp;
+            } else if (std.mem.eql(u8, value, "submit-cpu")) {
+                opts.timing = .submit_cpu;
+            } else {
+                log.err("unknown timing mode: {s}", .{value});
+                return error.InvalidArgument;
+            }
         } else if (std.mem.startsWith(u8, arg, "--device=")) {
             opts.device_index = try std.fmt.parseInt(usize, arg["--device=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--device-substr=")) {
@@ -328,7 +405,7 @@ const Vulkan = struct {
         app.applicationVersion = c.VK_MAKE_VERSION(0, 1, 0);
         app.pEngineName = "none";
         app.engineVersion = c.VK_MAKE_VERSION(0, 1, 0);
-        app.apiVersion = c.VK_API_VERSION_1_2;
+        app.apiVersion = c.VK_API_VERSION_1_4;
 
         var info: c.VkInstanceCreateInfo = std.mem.zeroes(c.VkInstanceCreateInfo);
         info.sType = c.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -341,10 +418,13 @@ const Vulkan = struct {
             .destroyInstance = try loadInstance(VkDestroyInstance, self.getInstanceProcAddr, instance, "vkDestroyInstance"),
             .enumeratePhysicalDevices = try loadInstance(VkEnumeratePhysicalDevices, self.getInstanceProcAddr, instance, "vkEnumeratePhysicalDevices"),
             .getPhysicalDeviceProperties = try loadInstance(VkGetPhysicalDeviceProperties, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceProperties"),
+            .getPhysicalDeviceFeatures2 = try loadInstance(VkGetPhysicalDeviceFeatures2, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceFeatures2"),
+            .getPhysicalDeviceProperties2 = try loadInstance(VkGetPhysicalDeviceProperties2, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceProperties2"),
             .getPhysicalDeviceMemoryProperties = try loadInstance(VkGetPhysicalDeviceMemoryProperties, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceMemoryProperties"),
             .getPhysicalDeviceQueueFamilyProperties = try loadInstance(VkGetPhysicalDeviceQueueFamilyProperties, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceQueueFamilyProperties"),
             .enumerateDeviceExtensionProperties = try loadInstance(VkEnumerateDeviceExtensionProperties, self.getInstanceProcAddr, instance, "vkEnumerateDeviceExtensionProperties"),
             .getCooperativeMatrixPropertiesKHR = loadInstanceOptional(VkGetPhysicalDeviceCooperativeMatrixPropertiesKHR, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR"),
+            .getCooperativeMatrixFlexibleDimensionsPropertiesNV = loadInstanceOptional(VkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV"),
             .createDevice = try loadInstance(VkCreateDevice, self.getInstanceProcAddr, instance, "vkCreateDevice"),
             .getDeviceProcAddr = try loadInstance(VkGetDeviceProcAddr, self.getInstanceProcAddr, instance, "vkGetDeviceProcAddr"),
         };
@@ -443,8 +523,14 @@ fn findComputeQueueFamily(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
 }
 
 fn validateCoopDimensions(opts: Options) void {
+    if (opts.shader.isNvCoop2()) {
+        if (opts.m % 64 == 0 and opts.n % 64 == 0 and opts.k % 16 == 0) return;
+        log.err("--shader={s} requires m % 64 == 0, n % 64 == 0, and k % 16 == 0; use --shader=zig or KHR coop modes for other dimensions", .{opts.shader.name()});
+        std.process.exit(2);
+    }
+
     const tile_n = opts.shader.outputTileN();
-    if (opts.m % 16 == 0 and opts.n % tile_n == 0 and opts.k % 16 == 0) return;
+    if (opts.m % opts.shader.outputTileM() == 0 and opts.n % tile_n == 0 and opts.k % 16 == 0) return;
     log.err("--shader={s} requires m % 16 == 0, n % {d} == 0, and k % 16 == 0; use --shader=zig for arbitrary dimensions", .{ opts.shader.name(), tile_n });
     std.process.exit(2);
 }
@@ -462,6 +548,10 @@ fn requireDeviceExtensions(vk: *Vulkan, allocator: std.mem.Allocator, physical_d
         log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME });
         return error.RequiredDeviceExtensionMissing;
     }
+    if (shader.isNvCoop2() and !hasDeviceExtension(extensions, c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
+        log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME });
+        return error.RequiredDeviceExtensionMissing;
+    }
     if (shader.isBf16() and !hasDeviceExtension(extensions, c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
         log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME });
         return error.RequiredDeviceExtensionMissing;
@@ -477,6 +567,8 @@ fn hasDeviceExtension(extensions: []const c.VkExtensionProperties, needle: []con
 }
 
 fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice, shader: ShaderMode) !void {
+    if (shader.isNvCoop2()) return requireNvCoop2Property(vk, allocator, physical_device, shader);
+
     const get_props = vk.instance.getCooperativeMatrixPropertiesKHR orelse {
         log.err("Vulkan loader does not expose vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR", .{});
         return error.RequiredDeviceExtensionMissing;
@@ -527,6 +619,108 @@ fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical
     return error.RequiredCoopMatrixPropertyMissing;
 }
 
+fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice, shader: ShaderMode) !void {
+    var base_props: c.VkPhysicalDeviceProperties = undefined;
+    vk.instance.getPhysicalDeviceProperties(physical_device, &base_props);
+    if (vendorId(&base_props) != 0x10de) {
+        log.err("{s} is NVIDIA-specific and requires vendorID 0x10de; selected vendorID is 0x{x}", .{ shader.name(), vendorId(&base_props) });
+        return error.RequiredDeviceFeatureMissing;
+    }
+
+    var nv2_features: c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV);
+    nv2_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV;
+    var khr_features: c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR);
+    khr_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
+    khr_features.pNext = &nv2_features;
+    var features2: c.VkPhysicalDeviceFeatures2 = std.mem.zeroes(c.VkPhysicalDeviceFeatures2);
+    features2.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features2.pNext = &khr_features;
+    vk.instance.getPhysicalDeviceFeatures2(physical_device, &features2);
+
+    if (khr_features.cooperativeMatrix != c.VK_TRUE or
+        nv2_features.cooperativeMatrixWorkgroupScope != c.VK_TRUE or
+        nv2_features.cooperativeMatrixFlexibleDimensions != c.VK_TRUE or
+        nv2_features.cooperativeMatrixTensorAddressing != c.VK_TRUE or
+        nv2_features.cooperativeMatrixBlockLoads != c.VK_TRUE)
+    {
+        log.err("{s} requires KHR cooperative matrix plus NV coop2 workgroup scope, flexible dimensions, tensor addressing, and block loads", .{shader.name()});
+        log.err("  features: khr={d} workgroup={d} flexible={d} tensor={d} block={d}", .{
+            khr_features.cooperativeMatrix,
+            nv2_features.cooperativeMatrixWorkgroupScope,
+            nv2_features.cooperativeMatrixFlexibleDimensions,
+            nv2_features.cooperativeMatrixTensorAddressing,
+            nv2_features.cooperativeMatrixBlockLoads,
+        });
+        return error.RequiredDeviceFeatureMissing;
+    }
+
+    var nv2_props: c.VkPhysicalDeviceCooperativeMatrix2PropertiesNV = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrix2PropertiesNV);
+    nv2_props.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_PROPERTIES_NV;
+    var properties2: c.VkPhysicalDeviceProperties2 = std.mem.zeroes(c.VkPhysicalDeviceProperties2);
+    properties2.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    properties2.pNext = &nv2_props;
+    vk.instance.getPhysicalDeviceProperties2(physical_device, &properties2);
+    if (nv2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize < 256 or nv2_props.cooperativeMatrixFlexibleDimensionsMaxDimension < 64) {
+        log.err("{s} requires NV coop2 maxWorkgroupSize >= 256 and maxDimension >= 64; got maxWorkgroupSize={d} maxDimension={d}", .{
+            shader.name(),
+            nv2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize,
+            nv2_props.cooperativeMatrixFlexibleDimensionsMaxDimension,
+        });
+        return error.RequiredCoopMatrixPropertyMissing;
+    }
+
+    const get_props = vk.instance.getCooperativeMatrixFlexibleDimensionsPropertiesNV orelse {
+        log.err("Vulkan loader does not expose vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV", .{});
+        return error.RequiredDeviceExtensionMissing;
+    };
+
+    var count: u32 = 0;
+    try vkCheck(get_props(physical_device, &count, null));
+    if (count == 0) {
+        log.err("{s} requires NV cooperative matrix flexible-dimension properties; selected device returned none", .{shader.name()});
+        return error.RequiredCoopMatrixPropertyMissing;
+    }
+
+    const props = try allocator.alloc(c.VkCooperativeMatrixFlexibleDimensionsPropertiesNV, count);
+    defer allocator.free(props);
+    for (props) |*prop| {
+        prop.* = std.mem.zeroes(c.VkCooperativeMatrixFlexibleDimensionsPropertiesNV);
+        prop.sType = c.VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_FLEXIBLE_DIMENSIONS_PROPERTIES_NV;
+    }
+    try vkCheck(get_props(physical_device, &count, props.ptr));
+
+    const input_type = shader.inputComponentType();
+    for (props[0..count]) |prop| {
+        if (64 % prop.MGranularity == 0 and 64 % prop.NGranularity == 0 and 16 % prop.KGranularity == 0 and
+            prop.AType == input_type and prop.BType == input_type and
+            prop.CType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
+            prop.ResultType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
+            prop.saturatingAccumulation == c.VK_FALSE and
+            prop.scope == c.VK_SCOPE_WORKGROUP_KHR and
+            prop.workgroupInvocations == 256)
+        {
+            return;
+        }
+    }
+
+    log.err("selected device lacks required {s} NV coop2 property: tile=64x64x16 A/B={d} C/Result=FLOAT32 scope=WORKGROUP invocations=256", .{ shader.name(), input_type });
+    for (props[0..@min(count, 32)]) |prop| {
+        log.err("  property: Mgran={d} Ngran={d} Kgran={d} A={d} B={d} C={d} Result={d} sat={d} scope={d} invocations={d}", .{
+            prop.MGranularity,
+            prop.NGranularity,
+            prop.KGranularity,
+            prop.AType,
+            prop.BType,
+            prop.CType,
+            prop.ResultType,
+            prop.saturatingAccumulation,
+            prop.scope,
+            prop.workgroupInvocations,
+        });
+    }
+    return error.RequiredCoopMatrixPropertyMissing;
+}
+
 const Device = struct {
     handle: c.VkDevice,
     fns: DeviceFns,
@@ -559,13 +753,16 @@ fn createDevice(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.Vk
     var extensions = [_][*:0]const u8{
         c.VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,
         c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME,
+        c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME,
     };
     if (shader.isCoop()) {
-        device_info.enabledExtensionCount = if (shader.isBf16()) 2 else 1;
+        device_info.enabledExtensionCount = if (shader.isNvCoop2()) (if (shader.isBf16()) 3 else 2) else (if (shader.isBf16()) 2 else 1);
+        if (shader.isNvCoop2() and !shader.isBf16()) extensions[1] = c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME;
         device_info.ppEnabledExtensionNames = extensions[0..device_info.enabledExtensionCount].ptr;
     }
 
     var coop_features: c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR);
+    var nvcoop2_features: c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV);
     var storage16_features: c.VkPhysicalDevice16BitStorageFeatures = std.mem.zeroes(c.VkPhysicalDevice16BitStorageFeatures);
     var f16_features: c.VkPhysicalDeviceShaderFloat16Int8Features = std.mem.zeroes(c.VkPhysicalDeviceShaderFloat16Int8Features);
     var bf16_features: c.VkPhysicalDeviceShaderBfloat16FeaturesKHR = std.mem.zeroes(c.VkPhysicalDeviceShaderBfloat16FeaturesKHR);
@@ -573,6 +770,14 @@ fn createDevice(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.Vk
     if (shader.isCoop()) {
         coop_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
         coop_features.cooperativeMatrix = c.VK_TRUE;
+        if (shader.isNvCoop2()) {
+            nvcoop2_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV;
+            nvcoop2_features.cooperativeMatrixWorkgroupScope = c.VK_TRUE;
+            nvcoop2_features.cooperativeMatrixFlexibleDimensions = c.VK_TRUE;
+            nvcoop2_features.cooperativeMatrixTensorAddressing = c.VK_TRUE;
+            nvcoop2_features.cooperativeMatrixBlockLoads = c.VK_TRUE;
+            coop_features.pNext = &nvcoop2_features;
+        }
 
         storage16_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
         storage16_features.storageBuffer16BitAccess = c.VK_TRUE;
@@ -634,6 +839,11 @@ fn createDevice(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.Vk
         .cmdDispatch = try loadDevice(VkCmdDispatch, vk.instance.getDeviceProcAddr, handle, "vkCmdDispatch"),
         .createFence = try loadDevice(VkCreateFence, vk.instance.getDeviceProcAddr, handle, "vkCreateFence"),
         .destroyFence = try loadDevice(VkDestroyFence, vk.instance.getDeviceProcAddr, handle, "vkDestroyFence"),
+        .createQueryPool = try loadDevice(VkCreateQueryPool, vk.instance.getDeviceProcAddr, handle, "vkCreateQueryPool"),
+        .destroyQueryPool = try loadDevice(VkDestroyQueryPool, vk.instance.getDeviceProcAddr, handle, "vkDestroyQueryPool"),
+        .getQueryPoolResults = try loadDevice(VkGetQueryPoolResults, vk.instance.getDeviceProcAddr, handle, "vkGetQueryPoolResults"),
+        .cmdResetQueryPool = try loadDevice(VkCmdResetQueryPool, vk.instance.getDeviceProcAddr, handle, "vkCmdResetQueryPool"),
+        .cmdWriteTimestamp = try loadDevice(VkCmdWriteTimestamp, vk.instance.getDeviceProcAddr, handle, "vkCmdWriteTimestamp"),
         .queueSubmit = try loadDevice(VkQueueSubmit, vk.instance.getDeviceProcAddr, handle, "vkQueueSubmit"),
         .waitForFences = try loadDevice(VkWaitForFences, vk.instance.getDeviceProcAddr, handle, "vkWaitForFences"),
         .resetFences = try loadDevice(VkResetFences, vk.instance.getDeviceProcAddr, handle, "vkResetFences"),
@@ -703,13 +913,19 @@ fn runScalarMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     const command_buffer = try allocateCommandBuffer(device, command_pool);
     try recordCommands(device, command_buffer, pipeline, pipeline_layout, descriptor_set, opts);
 
+    const timed_cmd = try allocateCommandBuffer(device, command_pool);
+    var query_pool: c.VkQueryPool = null;
+    if (opts.timing == .gpu_timestamp) query_pool = try createTimestampQueryPool(device);
+    defer if (query_pool != null) device.fns.destroyQueryPool(device.handle, query_pool, null);
+    if (opts.timing == .gpu_timestamp) try recordTimedCommands(device, timed_cmd, pipeline, pipeline_layout, descriptor_set, opts, query_pool);
+
     const fence = try createFence(device);
     defer device.fns.destroyFence(device.handle, fence, null);
 
-    const avg_ns = try timeRepeatedDispatch(device, command_buffer, fence, opts.warmup, opts.iters);
+    const timing = try timeDispatches(vk, device, command_buffer, timed_cmd, query_pool, fence, opts);
 
     try validate(out_values, a_values, b_values, opts.m, opts.n, opts.k);
-    printResult(opts, avg_ns);
+    printResult(opts, timing);
 }
 
 fn runCoopMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
@@ -761,20 +977,25 @@ fn runCoopMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
 
     const upload_cmd = try allocateCommandBuffer(device, command_pool);
     const compute_cmd = try allocateCommandBuffer(device, command_pool);
+    const timed_cmd = try allocateCommandBuffer(device, command_pool);
     const download_cmd = try allocateCommandBuffer(device, command_pool);
     try recordUploadCommands(device, upload_cmd, a_stage, a_dev, b_stage, b_dev);
     try recordCommands(device, compute_cmd, pipeline, pipeline_layout, descriptor_set, opts);
+    var query_pool: c.VkQueryPool = null;
+    if (opts.timing == .gpu_timestamp) query_pool = try createTimestampQueryPool(device);
+    defer if (query_pool != null) device.fns.destroyQueryPool(device.handle, query_pool, null);
+    if (opts.timing == .gpu_timestamp) try recordTimedCommands(device, timed_cmd, pipeline, pipeline_layout, descriptor_set, opts, query_pool);
     try recordDownloadCommands(device, download_cmd, out_dev, out_stage);
 
     const fence = try createFence(device);
     defer device.fns.destroyFence(device.handle, fence, null);
 
     try submitCommand(device, upload_cmd, fence);
-    const avg_ns = try timeRepeatedDispatch(device, compute_cmd, fence, opts.warmup, opts.iters);
+    const timing = try timeDispatches(vk, device, compute_cmd, timed_cmd, query_pool, fence, opts);
     try submitCommand(device, download_cmd, fence);
 
     try validateEncoded(out_values, opts);
-    printResult(opts, avg_ns);
+    printResult(opts, timing);
 }
 
 fn createBuffer(vk: *Vulkan, device: *Device, byte_len: usize, usage: c.VkBufferUsageFlags, required: c.VkMemoryPropertyFlags, map: bool) !Buffer {
@@ -838,6 +1059,8 @@ fn createShaderModule(device: *Device, shader: ShaderMode) !c.VkShaderModule {
         .coop_f16 => matmul_coop_f16_spv.words[0..],
         .coop_bf16_opt => matmul_coop_bf16_opt_spv.words[0..],
         .coop_f16_opt => matmul_coop_f16_opt_spv.words[0..],
+        .nvcoop2_bf16 => matmul_nvcoop2_bf16_spv.words[0..],
+        .nvcoop2_f16 => matmul_nvcoop2_f16_spv.words[0..],
     };
 
     var info: c.VkShaderModuleCreateInfo = std.mem.zeroes(c.VkShaderModuleCreateInfo);
@@ -980,9 +1203,22 @@ fn allocateCommandBuffer(device: *Device, pool: c.VkCommandPool) !c.VkCommandBuf
 }
 
 fn recordCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: c.VkPipeline, pipeline_layout: c.VkPipelineLayout, descriptor_set: c.VkDescriptorSet, opts: Options) !void {
+    return recordRepeatedCommands(device, command_buffer, pipeline, pipeline_layout, descriptor_set, opts, 1, null);
+}
+
+fn recordTimedCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: c.VkPipeline, pipeline_layout: c.VkPipelineLayout, descriptor_set: c.VkDescriptorSet, opts: Options, query_pool: c.VkQueryPool) !void {
+    return recordRepeatedCommands(device, command_buffer, pipeline, pipeline_layout, descriptor_set, opts, opts.iters, query_pool);
+}
+
+fn recordRepeatedCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: c.VkPipeline, pipeline_layout: c.VkPipelineLayout, descriptor_set: c.VkDescriptorSet, opts: Options, repeat_count: usize, query_pool: c.VkQueryPool) !void {
     var begin: c.VkCommandBufferBeginInfo = std.mem.zeroes(c.VkCommandBufferBeginInfo);
     begin.sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     try vkCheck(device.fns.beginCommandBuffer(command_buffer, &begin));
+
+    if (query_pool != null) {
+        device.fns.cmdResetQueryPool(command_buffer, query_pool, 0, 2);
+        device.fns.cmdWriteTimestamp(command_buffer, c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 0);
+    }
 
     const pc: PushConstants = .{
         .m = @intCast(opts.m),
@@ -998,8 +1234,12 @@ fn recordCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: 
     device.fns.cmdBindDescriptorSets(command_buffer, c.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, sets[0..].ptr, 0, null);
     device.fns.cmdPushConstants(command_buffer, pipeline_layout, c.VK_SHADER_STAGE_COMPUTE_BIT, 0, @sizeOf(PushConstants), &pc);
     const dispatch_x: u32 = if (opts.shader.isCoop()) @intCast(opts.n / opts.shader.outputTileN()) else roundUpDiv(@intCast(opts.n), 16);
-    const dispatch_y: u32 = if (opts.shader.isCoop()) @intCast(opts.m / 16) else roundUpDiv(@intCast(opts.m), 16);
-    device.fns.cmdDispatch(command_buffer, dispatch_x, dispatch_y, 1);
+    const dispatch_y: u32 = if (opts.shader.isCoop()) @intCast(opts.m / opts.shader.outputTileM()) else roundUpDiv(@intCast(opts.m), 16);
+    for (0..repeat_count) |_| device.fns.cmdDispatch(command_buffer, dispatch_x, dispatch_y, 1);
+
+    if (query_pool != null) {
+        device.fns.cmdWriteTimestamp(command_buffer, c.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool, 1);
+    }
 
     try vkCheck(device.fns.endCommandBuffer(command_buffer));
 }
@@ -1065,6 +1305,48 @@ fn createFence(device: *Device) !c.VkFence {
     return fence;
 }
 
+fn createTimestampQueryPool(device: *Device) !c.VkQueryPool {
+    var info: c.VkQueryPoolCreateInfo = std.mem.zeroes(c.VkQueryPoolCreateInfo);
+    info.sType = c.VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    info.queryType = c.VK_QUERY_TYPE_TIMESTAMP;
+    info.queryCount = 2;
+
+    var pool: c.VkQueryPool = null;
+    try vkCheck(device.fns.createQueryPool(device.handle, &info, null, &pool));
+    return pool;
+}
+
+fn timeDispatches(vk: *Vulkan, device: *Device, command_buffer: c.VkCommandBuffer, timed_command_buffer: c.VkCommandBuffer, query_pool: c.VkQueryPool, fence: c.VkFence, opts: Options) !TimingResult {
+    if (opts.timing == .submit_cpu) {
+        const avg_ns = try timeRepeatedDispatch(device, command_buffer, fence, opts.warmup, opts.iters);
+        return .{ .avg_ns = avg_ns };
+    }
+
+    try requireTimestampQueue(vk, device);
+    for (0..opts.warmup) |_| try submitCommand(device, command_buffer, fence);
+
+    const start = try nanoTimestamp();
+    try submitCommand(device, timed_command_buffer, fence);
+    const end = try nanoTimestamp();
+
+    var timestamps = [_]u64{ 0, 0 };
+    try vkCheck(device.fns.getQueryPoolResults(
+        device.handle,
+        query_pool,
+        0,
+        2,
+        @sizeOf(@TypeOf(timestamps)),
+        &timestamps,
+        @sizeOf(u64),
+        c.VK_QUERY_RESULT_64_BIT | c.VK_QUERY_RESULT_WAIT_BIT,
+    ));
+
+    const elapsed_ticks = timestamps[1] - timestamps[0];
+    const gpu_ns = @as(f64, @floatFromInt(elapsed_ticks)) * @as(f64, timestampPeriodNs(vk, device.physical_device)) / @as(f64, @floatFromInt(opts.iters));
+    const batch_cpu_ns = @as(f64, @floatFromInt(end - start)) / @as(f64, @floatFromInt(opts.iters));
+    return .{ .avg_ns = gpu_ns, .avg_gpu_ns = gpu_ns, .avg_batch_cpu_ns = batch_cpu_ns };
+}
+
 fn timeRepeatedDispatch(device: *Device, command_buffer: c.VkCommandBuffer, fence: c.VkFence, warmup: usize, iters: usize) !f64 {
     for (0..warmup) |_| try submitCommand(device, command_buffer, fence);
 
@@ -1074,6 +1356,20 @@ fn timeRepeatedDispatch(device: *Device, command_buffer: c.VkCommandBuffer, fenc
 
     const elapsed: f64 = @floatFromInt(end - start);
     return elapsed / @as(f64, @floatFromInt(iters));
+}
+
+fn requireTimestampQueue(vk: *Vulkan, device: *Device) !void {
+    var count: u32 = 0;
+    vk.instance.getPhysicalDeviceQueueFamilyProperties(device.physical_device, &count, null);
+    if (device.queue_family >= count) return error.TimestampUnsupported;
+
+    var stack_families: [64]c.VkQueueFamilyProperties = undefined;
+    if (count > stack_families.len) return error.TimestampUnsupported;
+    vk.instance.getPhysicalDeviceQueueFamilyProperties(device.physical_device, &count, stack_families[0..].ptr);
+    if (stack_families[device.queue_family].timestampValidBits == 0) {
+        log.err("selected compute queue family does not support timestamps; use --timing=submit-cpu", .{});
+        return error.TimestampUnsupported;
+    }
 }
 
 fn nanoTimestamp() !i128 {
@@ -1095,17 +1391,29 @@ fn submitCommand(device: *Device, command_buffer: c.VkCommandBuffer, fence: c.Vk
     try vkCheck(device.fns.resetFences(device.handle, 1, fences[0..].ptr));
 }
 
-fn printResult(opts: Options, avg_ns: f64) void {
+fn printResult(opts: Options, timing: TimingResult) void {
     const ops: f64 = 2.0 * @as(f64, @floatFromInt(opts.m)) * @as(f64, @floatFromInt(opts.n)) * @as(f64, @floatFromInt(opts.k));
-    const tflops = ops / avg_ns / 1.0e3;
-    std.debug.print("validation passed: shader={s} m={d} n={d} k={d} avg_ns={d:.2} TFLOP/s={d:.4}\n", .{
-        opts.shader.name(),
-        opts.m,
-        opts.n,
-        opts.k,
-        avg_ns,
-        tflops,
-    });
+    const tflops = ops / timing.avg_ns / 1.0e3;
+    if (timing.avg_gpu_ns) |avg_gpu_ns| {
+        std.debug.print("validation passed: shader={s} m={d} n={d} k={d} avg_gpu_ns={d:.2} avg_batch_cpu_ns={d:.2} TFLOP/s={d:.4}\n", .{
+            opts.shader.name(),
+            opts.m,
+            opts.n,
+            opts.k,
+            avg_gpu_ns,
+            timing.avg_batch_cpu_ns.?,
+            tflops,
+        });
+    } else {
+        std.debug.print("validation passed: shader={s} m={d} n={d} k={d} avg_ns={d:.2} TFLOP/s={d:.4}\n", .{
+            opts.shader.name(),
+            opts.m,
+            opts.n,
+            opts.k,
+            timing.avg_ns,
+            tflops,
+        });
+    }
 }
 
 fn fillInputA(dst: []f32, rows: usize, cols: usize) void {
@@ -1197,16 +1505,16 @@ fn inputBQuantized(row: usize, col: usize, shader: ShaderMode) f32 {
 
 fn encodeInput(value: f32, shader: ShaderMode) u16 {
     return switch (shader) {
-        .coop_f16, .coop_f16_opt => f32ToF16Bits(value),
-        .coop_bf16, .coop_bf16_opt => f32ToBf16Bits(value),
+        .coop_f16, .coop_f16_opt, .nvcoop2_f16 => f32ToF16Bits(value),
+        .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => f32ToBf16Bits(value),
         .zig => unreachable,
     };
 }
 
 fn decodeInput(bits: u16, shader: ShaderMode) f32 {
     return switch (shader) {
-        .coop_f16, .coop_f16_opt => f16BitsToF32(bits),
-        .coop_bf16, .coop_bf16_opt => bf16BitsToF32(bits),
+        .coop_f16, .coop_f16_opt, .nvcoop2_f16 => f16BitsToF32(bits),
+        .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => bf16BitsToF32(bits),
         .zig => unreachable,
     };
 }
@@ -1245,8 +1553,19 @@ fn apiVersion(props: *const c.VkPhysicalDeviceProperties) u32 {
     return std.mem.readInt(u32, props.bytes[0..4], .little);
 }
 
+fn vendorId(props: *const c.VkPhysicalDeviceProperties) u32 {
+    return std.mem.readInt(u32, props.bytes[8..12], .little);
+}
+
 fn deviceType(props: *const c.VkPhysicalDeviceProperties) u32 {
     return std.mem.readInt(u32, props.bytes[16..20], .little);
+}
+
+fn timestampPeriodNs(vk: *Vulkan, physical_device: c.VkPhysicalDevice) f32 {
+    var props: c.VkPhysicalDeviceProperties = undefined;
+    vk.instance.getPhysicalDeviceProperties(physical_device, &props);
+    const raw = std.mem.readInt(u32, props.bytes[720..724], .little);
+    return @bitCast(raw);
 }
 
 fn vkCheck(result: c.VkResult) !void {

@@ -161,6 +161,7 @@ const Options = struct {
     iters: usize = 50,
     warmup: usize = 5,
     list_devices: bool = false,
+    device_index: ?usize = null,
     device_substr: ?[]const u8 = null,
 };
 
@@ -195,6 +196,10 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(args);
 
     const opts = try parseArgs(args);
+    if (opts.device_index != null and opts.device_substr != null) {
+        log.err("use either --device=<index> or --device-substr=<text>, not both", .{});
+        return error.InvalidArgument;
+    }
     if (opts.m == 0 or opts.n == 0 or opts.k == 0) return error.InvalidDimensions;
     if (opts.iters == 0) return error.InvalidIterations;
     if (opts.m > std.math.maxInt(u32) or opts.n > std.math.maxInt(u32) or opts.k > std.math.maxInt(u32)) {
@@ -208,7 +213,7 @@ pub fn main(init: std.process.Init) !void {
     const instance = try vk.createInstance();
     defer vk.instance.destroyInstance(instance, null);
 
-    const selected = try selectPhysicalDevice(&vk, allocator, instance, opts.device_substr, opts.list_devices);
+    const selected = try selectPhysicalDevice(&vk, allocator, instance, opts.device_index, opts.device_substr, opts.list_devices);
     if (opts.list_devices) return;
 
     if (opts.shader.isCoop()) try requireCoopMatrixProperty(&vk, allocator, selected.physical_device, opts.shader);
@@ -246,6 +251,8 @@ fn parseArgs(args: []const []const u8) !Options {
             opts.iters = try std.fmt.parseInt(usize, arg["--iters=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--warmup=")) {
             opts.warmup = try std.fmt.parseInt(usize, arg["--warmup=".len..], 10);
+        } else if (std.mem.startsWith(u8, arg, "--device=")) {
+            opts.device_index = try std.fmt.parseInt(usize, arg["--device=".len..], 10);
         } else if (std.mem.startsWith(u8, arg, "--device-substr=")) {
             opts.device_substr = arg["--device-substr=".len..];
         } else {
@@ -337,10 +344,16 @@ const SelectedDevice = struct {
     queue_family: u32,
 };
 
-fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: c.VkInstance, device_substr: ?[]const u8, list_only: bool) !SelectedDevice {
+fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: c.VkInstance, device_index: ?usize, device_substr: ?[]const u8, list_only: bool) !SelectedDevice {
     var count: u32 = 0;
     try vkCheck(vk.instance.enumeratePhysicalDevices(instance, &count, null));
     if (count == 0) return error.NoVulkanDevice;
+    if (device_index) |index| {
+        if (index >= @as(usize, count)) {
+            log.err("--device={d} is out of range; use --list-devices to see available Vulkan devices", .{index});
+            std.process.exit(2);
+        }
+    }
 
     const devices = try allocator.alloc(c.VkPhysicalDevice, count);
     defer allocator.free(devices);
@@ -364,6 +377,9 @@ fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: c.V
         });
 
         if (list_only or queue_family == null) continue;
+        if (device_index) |index| {
+            if (i != index) continue;
+        }
         if (device_substr) |needle| {
             if (std.mem.indexOf(u8, name, needle) == null) continue;
         } else if (deviceType(&props) == c.VK_PHYSICAL_DEVICE_TYPE_CPU) {

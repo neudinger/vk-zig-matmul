@@ -26,6 +26,13 @@ List Vulkan devices:
 bazel run //:vk_matmul -- --list-devices
 ```
 
+Select a Vulkan device for computation:
+
+```bash
+bazel run //:vk_matmul -- --device=0 --shader=zig --m=64 --n=64 --k=64
+bazel run //:vk_matmul -- --device-substr=RTX --shader=coop --m=64 --n=64 --k=64
+```
+
 Build the Zig SPIR-V shader target:
 
 ```bash
@@ -48,6 +55,8 @@ Shader modes:
 - `--shader=zig`: scalar f32 path.
 - `--shader=coop` / `--shader=coop-bf16`: BF16 inputs with f32 accumulation and output.
 - `--shader=coop-f16`: FP16 inputs with f32 accumulation and output.
+- `--device=<index>`: select the Vulkan device index printed by `--list-devices`.
+- `--device-substr=<text>`: select the first non-CPU Vulkan device whose name contains the text.
 
 Cooperative modes require `VK_KHR_cooperative_matrix`; BF16 additionally
 requires `VK_KHR_shader_bfloat16`. The f16 target uses a 16x8x16 subgroup tile.

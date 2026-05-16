@@ -1,1 +1,4 @@
-exports_files(["patch_spv.zig"])
+exports_files([
+    "emit_coop_spv.zig",
+    "patch_spv.zig",
+])

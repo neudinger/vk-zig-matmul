@@ -7,6 +7,8 @@ zig_binary(
         "src/vulkan_loader.zig",
     ],
     deps = [
+        "//shaders:matmul_coop_bf16_spv_words",
+        "//shaders:matmul_coop_f16_spv_words",
         "//shaders:matmul_zig_spv_words",
     ],
     zigopts = [

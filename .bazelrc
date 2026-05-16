@@ -1,0 +1,13 @@
+common --enable_workspace=false
+common --enable_bzlmod
+common --enable_platform_specific_config
+common --incompatible_strict_action_env
+common --action_env=HOME=/tmp
+common --action_env=XDG_CACHE_HOME=/tmp
+common --enable_runfiles
+common --lockfile_mode=update
+common --compilation_mode=dbg
+common --host_compilation_mode=opt
+build:linux --sandbox_add_mount_pair=/tmp
+
+test --test_output=errors

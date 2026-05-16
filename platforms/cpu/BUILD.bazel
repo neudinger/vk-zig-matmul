@@ -1,0 +1,5 @@
+constraint_value(
+    name = "spirv32",
+    constraint_setting = "@platforms//cpu",
+    visibility = ["//visibility:public"],
+)

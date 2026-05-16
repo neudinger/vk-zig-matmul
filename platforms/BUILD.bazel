@@ -1,0 +1,7 @@
+platform(
+    name = "spirv32_vulkan",
+    constraint_values = [
+        "//platforms/cpu:spirv32",
+    ],
+    visibility = ["//visibility:public"],
+)

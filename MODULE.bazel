@@ -1,0 +1,38 @@
+module(
+    name = "vk_zig_matmul",
+)
+
+bazel_dep(name = "bazel_lib", version = "3.2.2")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_cc", version = "0.2.16")
+bazel_dep(name = "rules_zig", version = "0.12.2")
+
+vulkan_headers = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+vulkan_headers(
+    name = "vulkan_headers",
+    build_file_content = """
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
+cc_library(
+    name = "vulkan_headers",
+    hdrs = glob(["include/**/*.h"]),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+""",
+    sha256 = "666700236101d288dea8bb080c6f8039467cb1d29ea1e1aae6f93a819f4f9029",
+    strip_prefix = "Vulkan-Headers-015e25c3c91b70eb1a754d36fb14c4ba6ad9b0b9",
+    urls = ["https://github.com/KhronosGroup/Vulkan-Headers/archive/015e25c3c91b70eb1a754d36fb14c4ba6ad9b0b9.tar.gz"],
+)
+
+zig = use_extension("@rules_zig//zig:extensions.bzl", "zig")
+zig.index(file = "//bazel:zig_index.json")
+zig.toolchain(
+    default = True,
+    zig_version = "0.16.0",
+)
+use_repo(zig, "zig_toolchains")
+
+register_toolchains("@rules_zig//zig/target:all")
+register_toolchains("@zig_toolchains//:all")
+register_toolchains("//toolchains:spirv32_vulkan_target_toolchain")

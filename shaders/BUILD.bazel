@@ -1,0 +1,55 @@
+load("@rules_zig//zig:defs.bzl", "zig_library")
+
+genrule(
+    name = "matmul_zig_spv",
+    srcs = [
+        "matmul_kernel.zig",
+        "//tools:patch_spv.zig",
+    ],
+    outs = ["matmul_zig.spv"],
+    cmd = """
+set -euo pipefail
+raw="$(@D)/matmul_zig.raw.spv"
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) build-obj $(location matmul_kernel.zig) \
+    -target spirv32-vulkan \
+    -mcpu=vulkan_v1_2 \
+    -fno-llvm \
+    -fno-lld \
+    -fno-entry \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -femit-bin="$$raw"
+$(ZIG_BIN) run $(location //tools:patch_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$$raw" "$@"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_zig_spv_zig",
+    srcs = [
+        ":matmul_zig_spv",
+        "//tools:patch_spv.zig",
+    ],
+    outs = ["matmul_zig_spv.zig"],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:patch_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$(location :matmul_zig_spv)" "$(@D)/matmul_zig_spv.copy.spv" "$@" "matmul_zig_spv"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_zig_spv_words",
+    import_name = "matmul_zig_spv",
+    main = ":matmul_zig_spv_zig",
+    visibility = ["//visibility:public"],
+)

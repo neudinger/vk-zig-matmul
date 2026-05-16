@@ -1,0 +1,16 @@
+load("@rules_zig//zig:toolchain.bzl", "zig_target_toolchain")
+
+zig_target_toolchain(
+    name = "spirv32_vulkan",
+    target = "spirv32-vulkan",
+)
+
+toolchain(
+    name = "spirv32_vulkan_target_toolchain",
+    target_compatible_with = [
+        "//platforms/cpu:spirv32",
+    ],
+    toolchain = ":spirv32_vulkan",
+    toolchain_type = "@rules_zig//zig/target:toolchain_type",
+    visibility = ["//visibility:public"],
+)

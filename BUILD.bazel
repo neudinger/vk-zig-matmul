@@ -1,12 +1,25 @@
-load("@rules_zig//zig:defs.bzl", "zig_binary")
+load("@rules_zig//zig:defs.bzl", "zig_binary", "zig_library")
+
+genrule(
+    name = "vulkan_zig_binding",
+    srcs = ["@vulkan_headers//:registry/vk.xml"],
+    outs = ["vk.zig"],
+    cmd = "$(execpath @vulkan_zig//:vulkan_zig_generator) $(location @vulkan_headers//:registry/vk.xml) $@",
+    tools = ["@vulkan_zig//:vulkan_zig_generator"],
+)
+
+zig_library(
+    name = "vulkan",
+    import_name = "vulkan",
+    main = ":vulkan_zig_binding",
+    visibility = ["//visibility:public"],
+)
 
 zig_binary(
     name = "vk_matmul",
     main = "src/main.zig",
-    srcs = [
-        "src/vulkan_loader.zig",
-    ],
     deps = [
+        ":vulkan",
         "//shaders:matmul_coop_bf16_opt_spv_words",
         "//shaders:matmul_coop_bf16_spv_words",
         "//shaders:matmul_coop_f16_opt_spv_words",

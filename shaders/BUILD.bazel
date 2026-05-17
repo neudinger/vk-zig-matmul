@@ -68,8 +68,9 @@ $(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=f16 "$(@D)/matmul_coop_f16.spv" "$(@D)/matmul_coop_f16_spv.zig"
-spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_f16.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.3 "$(@D)/matmul_coop_f16.spv"
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -94,8 +95,9 @@ $(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=f16-opt "$(@D)/matmul_coop_f16_opt.spv" "$(@D)/matmul_coop_f16_opt_spv.zig"
-spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_f16_opt.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.3 "$(@D)/matmul_coop_f16_opt.spv"
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -120,8 +122,9 @@ $(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=f16-wg "$(@D)/matmul_coop_shared_f16.spv" "$(@D)/matmul_coop_shared_f16_spv.zig"
-spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_shared_f16.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.3 "$(@D)/matmul_coop_shared_f16.spv"
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -146,12 +149,13 @@ $(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=bf16 "$(@D)/matmul_coop_bf16.spv" "$(@D)/matmul_coop_bf16_spv.zig"
-if spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_bf16.spv"; then
+if $(execpath @spirv_tools//:spirv-val) --target-env vulkan1.3 "$(@D)/matmul_coop_bf16.spv"; then
     :
 else
-    echo "warning: installed spirv-val does not recognize SPV_KHR_bfloat16 yet; generated BF16 SPIR-V was not validator-checked" >&2
+    echo "warning: pinned SPIR-V validator does not recognize SPV_KHR_bfloat16 yet; generated BF16 SPIR-V was not validator-checked" >&2
 fi
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -176,12 +180,13 @@ $(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=bf16-opt "$(@D)/matmul_coop_bf16_opt.spv" "$(@D)/matmul_coop_bf16_opt_spv.zig"
-if spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_bf16_opt.spv"; then
+if $(execpath @spirv_tools//:spirv-val) --target-env vulkan1.3 "$(@D)/matmul_coop_bf16_opt.spv"; then
     :
 else
-    echo "warning: installed spirv-val does not recognize SPV_KHR_bfloat16 yet; generated BF16 opt SPIR-V was not validator-checked" >&2
+    echo "warning: pinned SPIR-V validator does not recognize SPV_KHR_bfloat16 yet; generated BF16 opt SPIR-V was not validator-checked" >&2
 fi
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -206,8 +211,9 @@ $(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=f16 "$(@D)/matmul_nvcoop2_f16.spv" "$(@D)/matmul_nvcoop2_f16_spv.zig"
-spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_f16.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_f16.spv"
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -232,8 +238,9 @@ $(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=f16-wide "$(@D)/matmul_nvcoop2_wide_f16.spv" "$(@D)/matmul_nvcoop2_wide_f16_spv.zig"
-spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_wide_f16.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_wide_f16.spv"
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -258,8 +265,9 @@ $(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=f16-square "$(@D)/matmul_nvcoop2_square_f16.spv" "$(@D)/matmul_nvcoop2_square_f16_spv.zig"
-spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_square_f16.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_square_f16.spv"
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 
@@ -284,12 +292,13 @@ $(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
     --cache-dir "$$cache" \
     --global-cache-dir "$$cache" \
     -- --mode=bf16 "$(@D)/matmul_nvcoop2_bf16.spv" "$(@D)/matmul_nvcoop2_bf16_spv.zig"
-if spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_bf16.spv"; then
+if $(execpath @spirv_tools//:spirv-val) --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_bf16.spv"; then
     :
 else
-    echo "warning: installed spirv-val does not recognize SPV_KHR_bfloat16 yet; generated NV BF16 SPIR-V was not validator-checked" >&2
+    echo "warning: pinned SPIR-V validator does not recognize SPV_KHR_bfloat16 yet; generated NV BF16 SPIR-V was not validator-checked" >&2
 fi
 """,
+    tools = ["@spirv_tools//:spirv-val"],
     toolchains = ["@rules_zig//zig:resolved_toolchain"],
 )
 

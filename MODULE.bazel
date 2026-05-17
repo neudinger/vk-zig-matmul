@@ -6,6 +6,7 @@ bazel_dep(name = "bazel_lib", version = "3.2.2")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.16")
 bazel_dep(name = "rules_zig", version = "0.12.2")
+bazel_dep(name = "spirv_tools", version = "2026.1")
 
 vulkan_headers = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 vulkan_headers(
@@ -19,10 +20,30 @@ cc_library(
     includes = ["include"],
     visibility = ["//visibility:public"],
 )
+
+exports_files(["registry/vk.xml"])
 """,
     sha256 = "666700236101d288dea8bb080c6f8039467cb1d29ea1e1aae6f93a819f4f9029",
     strip_prefix = "Vulkan-Headers-015e25c3c91b70eb1a754d36fb14c4ba6ad9b0b9",
     urls = ["https://github.com/KhronosGroup/Vulkan-Headers/archive/015e25c3c91b70eb1a754d36fb14c4ba6ad9b0b9.tar.gz"],
+)
+
+vulkan_zig = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+vulkan_zig(
+    name = "vulkan_zig",
+    build_file_content = """
+load("@rules_zig//zig:defs.bzl", "zig_binary")
+
+zig_binary(
+    name = "vulkan_zig_generator",
+    main = "src/main.zig",
+    srcs = glob(["src/**/*.zig"]),
+    visibility = ["//visibility:public"],
+)
+""",
+    sha256 = "f2e246106029392d263f498826f5a29f8687eba8682535e18c571a5fe1c62382",
+    strip_prefix = "vulkan-zig-b496a6a561ffbbeb530b0f9ed4e059f88c0723a5",
+    urls = ["https://github.com/Snektron/vulkan-zig/archive/b496a6a561ffbbeb530b0f9ed4e059f88c0723a5.tar.gz"],
 )
 
 zig = use_extension("@rules_zig//zig:extensions.bzl", "zig")

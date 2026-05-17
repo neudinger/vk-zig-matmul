@@ -9,12 +9,9 @@ const matmul_nvcoop2_f16_spv = @import("matmul_nvcoop2_f16_spv");
 const matmul_nvcoop2_square_f16_spv = @import("matmul_nvcoop2_square_f16_spv");
 const matmul_nvcoop2_wide_f16_spv = @import("matmul_nvcoop2_wide_f16_spv");
 const matmul_zig_spv = @import("matmul_zig_spv");
-const c = @import("vulkan_loader.zig").c;
+const zvk = @import("vulkan");
 
 const log = std.log.scoped(.vk_matmul);
-
-const VkGetInstanceProcAddr = *const fn (c.VkInstance, [*:0]const u8) callconv(.c) c.PFN_vkVoidFunction;
-const VkGetDeviceProcAddr = *const fn (c.VkDevice, [*:0]const u8) callconv(.c) c.PFN_vkVoidFunction;
 
 const CLOCK_MONOTONIC: c_int = 1;
 const Timespec = extern struct {
@@ -22,125 +19,6 @@ const Timespec = extern struct {
     tv_nsec: isize,
 };
 extern fn clock_gettime(clk_id: c_int, tp: *Timespec) callconv(.c) c_int;
-
-const VkCreateInstance = *const fn (*const c.VkInstanceCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkInstance) callconv(.c) c.VkResult;
-const VkDestroyInstance = *const fn (c.VkInstance, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkEnumeratePhysicalDevices = *const fn (c.VkInstance, *u32, ?[*]c.VkPhysicalDevice) callconv(.c) c.VkResult;
-const VkGetPhysicalDeviceProperties = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceProperties) callconv(.c) void;
-const VkGetPhysicalDeviceFeatures2 = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceFeatures2) callconv(.c) void;
-const VkGetPhysicalDeviceProperties2 = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceProperties2) callconv(.c) void;
-const VkGetPhysicalDeviceMemoryProperties = *const fn (c.VkPhysicalDevice, *c.VkPhysicalDeviceMemoryProperties) callconv(.c) void;
-const VkGetPhysicalDeviceQueueFamilyProperties = *const fn (c.VkPhysicalDevice, *u32, ?[*]c.VkQueueFamilyProperties) callconv(.c) void;
-const VkEnumerateDeviceExtensionProperties = *const fn (c.VkPhysicalDevice, ?[*:0]const u8, *u32, ?[*]c.VkExtensionProperties) callconv(.c) c.VkResult;
-const VkGetPhysicalDeviceCooperativeMatrixPropertiesKHR = *const fn (c.VkPhysicalDevice, *u32, ?[*]c.VkCooperativeMatrixPropertiesKHR) callconv(.c) c.VkResult;
-const VkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV = *const fn (c.VkPhysicalDevice, *u32, ?[*]c.VkCooperativeMatrixFlexibleDimensionsPropertiesNV) callconv(.c) c.VkResult;
-const VkCreateDevice = *const fn (c.VkPhysicalDevice, *const c.VkDeviceCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkDevice) callconv(.c) c.VkResult;
-const VkDestroyDevice = *const fn (c.VkDevice, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkGetDeviceQueue = *const fn (c.VkDevice, u32, u32, *c.VkQueue) callconv(.c) void;
-const VkCreateBuffer = *const fn (c.VkDevice, *const c.VkBufferCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkBuffer) callconv(.c) c.VkResult;
-const VkDestroyBuffer = *const fn (c.VkDevice, c.VkBuffer, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkGetBufferMemoryRequirements = *const fn (c.VkDevice, c.VkBuffer, *c.VkMemoryRequirements) callconv(.c) void;
-const VkAllocateMemory = *const fn (c.VkDevice, *const c.VkMemoryAllocateInfo, ?*const c.VkAllocationCallbacks, *c.VkDeviceMemory) callconv(.c) c.VkResult;
-const VkFreeMemory = *const fn (c.VkDevice, c.VkDeviceMemory, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkBindBufferMemory = *const fn (c.VkDevice, c.VkBuffer, c.VkDeviceMemory, c.VkDeviceSize) callconv(.c) c.VkResult;
-const VkMapMemory = *const fn (c.VkDevice, c.VkDeviceMemory, c.VkDeviceSize, c.VkDeviceSize, c.VkMemoryMapFlags, *?*anyopaque) callconv(.c) c.VkResult;
-const VkUnmapMemory = *const fn (c.VkDevice, c.VkDeviceMemory) callconv(.c) void;
-const VkCreateShaderModule = *const fn (c.VkDevice, *const c.VkShaderModuleCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkShaderModule) callconv(.c) c.VkResult;
-const VkDestroyShaderModule = *const fn (c.VkDevice, c.VkShaderModule, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkCreateDescriptorSetLayout = *const fn (c.VkDevice, *const c.VkDescriptorSetLayoutCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkDescriptorSetLayout) callconv(.c) c.VkResult;
-const VkDestroyDescriptorSetLayout = *const fn (c.VkDevice, c.VkDescriptorSetLayout, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkCreatePipelineLayout = *const fn (c.VkDevice, *const c.VkPipelineLayoutCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkPipelineLayout) callconv(.c) c.VkResult;
-const VkDestroyPipelineLayout = *const fn (c.VkDevice, c.VkPipelineLayout, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkCreateComputePipelines = *const fn (c.VkDevice, c.VkPipelineCache, u32, [*]const c.VkComputePipelineCreateInfo, ?*const c.VkAllocationCallbacks, [*]c.VkPipeline) callconv(.c) c.VkResult;
-const VkDestroyPipeline = *const fn (c.VkDevice, c.VkPipeline, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkCreateDescriptorPool = *const fn (c.VkDevice, *const c.VkDescriptorPoolCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkDescriptorPool) callconv(.c) c.VkResult;
-const VkDestroyDescriptorPool = *const fn (c.VkDevice, c.VkDescriptorPool, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkAllocateDescriptorSets = *const fn (c.VkDevice, *const c.VkDescriptorSetAllocateInfo, [*]c.VkDescriptorSet) callconv(.c) c.VkResult;
-const VkUpdateDescriptorSets = *const fn (c.VkDevice, u32, [*]const c.VkWriteDescriptorSet, u32, ?*const anyopaque) callconv(.c) void;
-const VkCreateCommandPool = *const fn (c.VkDevice, *const c.VkCommandPoolCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkCommandPool) callconv(.c) c.VkResult;
-const VkDestroyCommandPool = *const fn (c.VkDevice, c.VkCommandPool, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkAllocateCommandBuffers = *const fn (c.VkDevice, *const c.VkCommandBufferAllocateInfo, [*]c.VkCommandBuffer) callconv(.c) c.VkResult;
-const VkBeginCommandBuffer = *const fn (c.VkCommandBuffer, *const c.VkCommandBufferBeginInfo) callconv(.c) c.VkResult;
-const VkEndCommandBuffer = *const fn (c.VkCommandBuffer) callconv(.c) c.VkResult;
-const VkCmdBindPipeline = *const fn (c.VkCommandBuffer, c.VkPipelineBindPoint, c.VkPipeline) callconv(.c) void;
-const VkCmdBindDescriptorSets = *const fn (c.VkCommandBuffer, c.VkPipelineBindPoint, c.VkPipelineLayout, u32, u32, [*]const c.VkDescriptorSet, u32, ?[*]const u32) callconv(.c) void;
-const VkCmdPushConstants = *const fn (c.VkCommandBuffer, c.VkPipelineLayout, c.VkShaderStageFlags, u32, u32, *const anyopaque) callconv(.c) void;
-const VkCmdCopyBuffer = *const fn (c.VkCommandBuffer, c.VkBuffer, c.VkBuffer, u32, [*]const c.VkBufferCopy) callconv(.c) void;
-const VkCmdPipelineBarrier = *const fn (c.VkCommandBuffer, c.VkPipelineStageFlags, c.VkPipelineStageFlags, c.VkDependencyFlags, u32, ?*const anyopaque, u32, ?[*]const c.VkBufferMemoryBarrier, u32, ?*const anyopaque) callconv(.c) void;
-const VkCmdDispatch = *const fn (c.VkCommandBuffer, u32, u32, u32) callconv(.c) void;
-const VkCreateFence = *const fn (c.VkDevice, *const c.VkFenceCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkFence) callconv(.c) c.VkResult;
-const VkDestroyFence = *const fn (c.VkDevice, c.VkFence, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkCreateQueryPool = *const fn (c.VkDevice, *const c.VkQueryPoolCreateInfo, ?*const c.VkAllocationCallbacks, *c.VkQueryPool) callconv(.c) c.VkResult;
-const VkDestroyQueryPool = *const fn (c.VkDevice, c.VkQueryPool, ?*const c.VkAllocationCallbacks) callconv(.c) void;
-const VkGetQueryPoolResults = *const fn (c.VkDevice, c.VkQueryPool, u32, u32, usize, *anyopaque, c.VkDeviceSize, c.VkQueryResultFlags) callconv(.c) c.VkResult;
-const VkCmdResetQueryPool = *const fn (c.VkCommandBuffer, c.VkQueryPool, u32, u32) callconv(.c) void;
-const VkCmdWriteTimestamp = *const fn (c.VkCommandBuffer, c.VkPipelineStageFlags, c.VkQueryPool, u32) callconv(.c) void;
-const VkQueueSubmit = *const fn (c.VkQueue, u32, [*]const c.VkSubmitInfo, c.VkFence) callconv(.c) c.VkResult;
-const VkWaitForFences = *const fn (c.VkDevice, u32, [*]const c.VkFence, c.VkBool32, u64) callconv(.c) c.VkResult;
-const VkResetFences = *const fn (c.VkDevice, u32, [*]const c.VkFence) callconv(.c) c.VkResult;
-const VkDeviceWaitIdle = *const fn (c.VkDevice) callconv(.c) c.VkResult;
-
-const InstanceFns = struct {
-    destroyInstance: VkDestroyInstance,
-    enumeratePhysicalDevices: VkEnumeratePhysicalDevices,
-    getPhysicalDeviceProperties: VkGetPhysicalDeviceProperties,
-    getPhysicalDeviceFeatures2: VkGetPhysicalDeviceFeatures2,
-    getPhysicalDeviceProperties2: VkGetPhysicalDeviceProperties2,
-    getPhysicalDeviceMemoryProperties: VkGetPhysicalDeviceMemoryProperties,
-    getPhysicalDeviceQueueFamilyProperties: VkGetPhysicalDeviceQueueFamilyProperties,
-    enumerateDeviceExtensionProperties: VkEnumerateDeviceExtensionProperties,
-    getCooperativeMatrixPropertiesKHR: ?VkGetPhysicalDeviceCooperativeMatrixPropertiesKHR,
-    getCooperativeMatrixFlexibleDimensionsPropertiesNV: ?VkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV,
-    createDevice: VkCreateDevice,
-    getDeviceProcAddr: VkGetDeviceProcAddr,
-};
-
-const DeviceFns = struct {
-    destroyDevice: VkDestroyDevice,
-    getDeviceQueue: VkGetDeviceQueue,
-    createBuffer: VkCreateBuffer,
-    destroyBuffer: VkDestroyBuffer,
-    getBufferMemoryRequirements: VkGetBufferMemoryRequirements,
-    allocateMemory: VkAllocateMemory,
-    freeMemory: VkFreeMemory,
-    bindBufferMemory: VkBindBufferMemory,
-    mapMemory: VkMapMemory,
-    unmapMemory: VkUnmapMemory,
-    createShaderModule: VkCreateShaderModule,
-    destroyShaderModule: VkDestroyShaderModule,
-    createDescriptorSetLayout: VkCreateDescriptorSetLayout,
-    destroyDescriptorSetLayout: VkDestroyDescriptorSetLayout,
-    createPipelineLayout: VkCreatePipelineLayout,
-    destroyPipelineLayout: VkDestroyPipelineLayout,
-    createComputePipelines: VkCreateComputePipelines,
-    destroyPipeline: VkDestroyPipeline,
-    createDescriptorPool: VkCreateDescriptorPool,
-    destroyDescriptorPool: VkDestroyDescriptorPool,
-    allocateDescriptorSets: VkAllocateDescriptorSets,
-    updateDescriptorSets: VkUpdateDescriptorSets,
-    createCommandPool: VkCreateCommandPool,
-    destroyCommandPool: VkDestroyCommandPool,
-    allocateCommandBuffers: VkAllocateCommandBuffers,
-    beginCommandBuffer: VkBeginCommandBuffer,
-    endCommandBuffer: VkEndCommandBuffer,
-    cmdBindPipeline: VkCmdBindPipeline,
-    cmdBindDescriptorSets: VkCmdBindDescriptorSets,
-    cmdPushConstants: VkCmdPushConstants,
-    cmdCopyBuffer: VkCmdCopyBuffer,
-    cmdPipelineBarrier: VkCmdPipelineBarrier,
-    cmdDispatch: VkCmdDispatch,
-    createFence: VkCreateFence,
-    destroyFence: VkDestroyFence,
-    createQueryPool: VkCreateQueryPool,
-    destroyQueryPool: VkDestroyQueryPool,
-    getQueryPoolResults: VkGetQueryPoolResults,
-    cmdResetQueryPool: VkCmdResetQueryPool,
-    cmdWriteTimestamp: VkCmdWriteTimestamp,
-    queueSubmit: VkQueueSubmit,
-    waitForFences: VkWaitForFences,
-    resetFences: VkResetFences,
-    deviceWaitIdle: VkDeviceWaitIdle,
-};
 
 const ShaderMode = enum {
     zig,
@@ -194,11 +72,11 @@ const ShaderMode = enum {
         };
     }
 
-    fn inputComponentType(self: ShaderMode) c.VkComponentTypeKHR {
+    fn inputComponentType(self: ShaderMode) zvk.ComponentTypeKHR {
         return switch (self) {
-            .zig => c.VK_COMPONENT_TYPE_FLOAT32_KHR,
-            .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => c.VK_COMPONENT_TYPE_BFLOAT16_KHR,
-            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => c.VK_COMPONENT_TYPE_FLOAT16_KHR,
+            .zig => zvk.ComponentTypeKHR.float32_khr,
+            .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => zvk.ComponentTypeKHR.bfloat16_khr,
+            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => zvk.ComponentTypeKHR.float16_khr,
         };
     }
 
@@ -267,8 +145,8 @@ const PushConstants = extern struct {
 };
 
 const Buffer = struct {
-    handle: c.VkBuffer,
-    memory: c.VkDeviceMemory,
+    handle: zvk.Buffer,
+    memory: zvk.DeviceMemory,
     mapped: ?[*]u8,
     byte_len: usize,
 
@@ -303,7 +181,7 @@ pub fn main(init: std.process.Init) !void {
     defer vk.close();
 
     const instance = try vk.createInstance();
-    defer vk.instance.destroyInstance(instance, null);
+    defer vk.instance.dispatch.vkDestroyInstance.?(instance, null);
 
     const selected = try selectPhysicalDevice(&vk, allocator, instance, opts.device_index, opts.device_substr, opts.list_devices);
     if (opts.list_devices) return;
@@ -394,21 +272,23 @@ fn parseArgs(args: []const []const u8) !Options {
 
 const Vulkan = struct {
     lib: std.DynLib,
-    getInstanceProcAddr: VkGetInstanceProcAddr,
-    createInstanceFn: VkCreateInstance,
-    instance: InstanceFns,
+    getInstanceProcAddr: zvk.PfnGetInstanceProcAddr,
+    base: zvk.BaseWrapper,
+    instance: zvk.InstanceWrapper,
 
     fn open() !Vulkan {
         var lib = try std.DynLib.open("libvulkan.so.1");
         errdefer lib.close();
 
-        const gip = lib.lookup(VkGetInstanceProcAddr, "vkGetInstanceProcAddr") orelse return error.SymbolNotFound;
-        const create_instance = try loadGlobal(VkCreateInstance, gip, "vkCreateInstance");
+        const gip = lib.lookup(zvk.PfnGetInstanceProcAddr, "vkGetInstanceProcAddr") orelse return error.SymbolNotFound;
+        var base = zvk.BaseWrapper{ .dispatch = .{} };
+        base.dispatch.vkGetInstanceProcAddr = gip;
+        base.dispatch.vkCreateInstance = @ptrCast(gip(.null_handle, "vkCreateInstance") orelse return error.SymbolNotFound);
 
         return .{
             .lib = lib,
             .getInstanceProcAddr = gip,
-            .createInstanceFn = create_instance,
+            .base = base,
             .instance = undefined,
         };
     }
@@ -417,68 +297,32 @@ const Vulkan = struct {
         self.lib.close();
     }
 
-    fn createInstance(self: *Vulkan) !c.VkInstance {
-        var app: c.VkApplicationInfo = std.mem.zeroes(c.VkApplicationInfo);
-        app.sType = c.VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        app.pApplicationName = "vk-zig-matmul";
-        app.applicationVersion = c.VK_MAKE_VERSION(0, 1, 0);
-        app.pEngineName = "none";
-        app.engineVersion = c.VK_MAKE_VERSION(0, 1, 0);
-        app.apiVersion = c.VK_API_VERSION_1_4;
-
-        var info: c.VkInstanceCreateInfo = std.mem.zeroes(c.VkInstanceCreateInfo);
-        info.sType = c.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        info.pApplicationInfo = &app;
-
-        var instance: c.VkInstance = null;
-        try vkCheck(self.createInstanceFn(&info, null, &instance));
-
-        self.instance = .{
-            .destroyInstance = try loadInstance(VkDestroyInstance, self.getInstanceProcAddr, instance, "vkDestroyInstance"),
-            .enumeratePhysicalDevices = try loadInstance(VkEnumeratePhysicalDevices, self.getInstanceProcAddr, instance, "vkEnumeratePhysicalDevices"),
-            .getPhysicalDeviceProperties = try loadInstance(VkGetPhysicalDeviceProperties, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceProperties"),
-            .getPhysicalDeviceFeatures2 = try loadInstance(VkGetPhysicalDeviceFeatures2, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceFeatures2"),
-            .getPhysicalDeviceProperties2 = try loadInstance(VkGetPhysicalDeviceProperties2, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceProperties2"),
-            .getPhysicalDeviceMemoryProperties = try loadInstance(VkGetPhysicalDeviceMemoryProperties, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceMemoryProperties"),
-            .getPhysicalDeviceQueueFamilyProperties = try loadInstance(VkGetPhysicalDeviceQueueFamilyProperties, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceQueueFamilyProperties"),
-            .enumerateDeviceExtensionProperties = try loadInstance(VkEnumerateDeviceExtensionProperties, self.getInstanceProcAddr, instance, "vkEnumerateDeviceExtensionProperties"),
-            .getCooperativeMatrixPropertiesKHR = loadInstanceOptional(VkGetPhysicalDeviceCooperativeMatrixPropertiesKHR, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR"),
-            .getCooperativeMatrixFlexibleDimensionsPropertiesNV = loadInstanceOptional(VkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV, self.getInstanceProcAddr, instance, "vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV"),
-            .createDevice = try loadInstance(VkCreateDevice, self.getInstanceProcAddr, instance, "vkCreateDevice"),
-            .getDeviceProcAddr = try loadInstance(VkGetDeviceProcAddr, self.getInstanceProcAddr, instance, "vkGetDeviceProcAddr"),
+    fn createInstance(self: *Vulkan) !zvk.Instance {
+        var app: zvk.ApplicationInfo = .{
+            .application_version = zvk.makeApiVersion(0, 0, 1, 0).toU32(),
+            .engine_version = zvk.makeApiVersion(0, 0, 1, 0).toU32(),
+            .api_version = zvk.API_VERSION_1_4.toU32(),
         };
+        app.p_application_name = "vk-zig-matmul";
+        app.p_engine_name = "none";
+
+        var info: zvk.InstanceCreateInfo = .{};
+        info.p_application_info = &app;
+
+        const instance = try self.base.createInstance(&info, null);
+        self.instance = zvk.InstanceWrapper.load(instance, self.getInstanceProcAddr);
         return instance;
     }
 };
 
-fn loadGlobal(comptime T: type, gip: VkGetInstanceProcAddr, name: [*:0]const u8) !T {
-    const raw = gip(null, name) orelse return error.SymbolNotFound;
-    return @ptrCast(raw);
-}
-
-fn loadInstance(comptime T: type, gip: VkGetInstanceProcAddr, instance: c.VkInstance, name: [*:0]const u8) !T {
-    const raw = gip(instance, name) orelse return error.SymbolNotFound;
-    return @ptrCast(raw);
-}
-
-fn loadInstanceOptional(comptime T: type, gip: VkGetInstanceProcAddr, instance: c.VkInstance, name: [*:0]const u8) ?T {
-    const raw = gip(instance, name) orelse return null;
-    return @ptrCast(raw);
-}
-
-fn loadDevice(comptime T: type, gdp: VkGetDeviceProcAddr, device: c.VkDevice, name: [*:0]const u8) !T {
-    const raw = gdp(device, name) orelse return error.SymbolNotFound;
-    return @ptrCast(raw);
-}
-
 const SelectedDevice = struct {
-    physical_device: c.VkPhysicalDevice,
+    physical_device: zvk.PhysicalDevice,
     queue_family: u32,
 };
 
-fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: c.VkInstance, device_index: ?usize, device_substr: ?[]const u8, list_only: bool) !SelectedDevice {
+fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: zvk.Instance, device_index: ?usize, device_substr: ?[]const u8, list_only: bool) !SelectedDevice {
     var count: u32 = 0;
-    try vkCheck(vk.instance.enumeratePhysicalDevices(instance, &count, null));
+    try vkCheck(vk.instance.dispatch.vkEnumeratePhysicalDevices.?(instance, &count, null));
     if (count == 0) return error.NoVulkanDevice;
     if (device_index) |index| {
         if (index >= @as(usize, count)) {
@@ -487,24 +331,24 @@ fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: c.V
         }
     }
 
-    const devices = try allocator.alloc(c.VkPhysicalDevice, count);
+    const devices = try allocator.alloc(zvk.PhysicalDevice, count);
     defer allocator.free(devices);
-    try vkCheck(vk.instance.enumeratePhysicalDevices(instance, &count, devices.ptr));
+    try vkCheck(vk.instance.dispatch.vkEnumeratePhysicalDevices.?(instance, &count, devices.ptr));
 
     var selected: ?SelectedDevice = null;
     for (devices[0..count], 0..) |physical_device, i| {
-        var props: c.VkPhysicalDeviceProperties = undefined;
-        vk.instance.getPhysicalDeviceProperties(physical_device, &props);
+        var props: zvk.PhysicalDeviceProperties = undefined;
+        vk.instance.dispatch.vkGetPhysicalDeviceProperties.?(physical_device, &props);
         const name = deviceName(&props);
         const queue_family = findComputeQueueFamily(vk, allocator, physical_device) catch null;
 
         std.debug.print("device[{d}]: {s} type={d} api={d}.{d}.{d}{s}\n", .{
             i,
             name,
-            deviceType(&props),
-            c.VK_VERSION_MAJOR(apiVersion(&props)),
-            c.VK_VERSION_MINOR(apiVersion(&props)),
-            c.VK_VERSION_PATCH(apiVersion(&props)),
+            @intFromEnum(deviceType(&props)),
+            versionMajor(api_version(&props)),
+            versionMinor(api_version(&props)),
+            versionPatch(api_version(&props)),
             if (queue_family == null) " no-compute-queue" else "",
         });
 
@@ -514,7 +358,7 @@ fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: c.V
         }
         if (device_substr) |needle| {
             if (std.mem.indexOf(u8, name, needle) == null) continue;
-        } else if (deviceType(&props) == c.VK_PHYSICAL_DEVICE_TYPE_CPU) {
+        } else if (deviceType(&props) == zvk.PhysicalDeviceType.cpu) {
             continue;
         }
         if (selected == null) {
@@ -526,17 +370,17 @@ fn selectPhysicalDevice(vk: *Vulkan, allocator: std.mem.Allocator, instance: c.V
     return selected orelse error.NoMatchingDevice;
 }
 
-fn findComputeQueueFamily(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice) !?u32 {
+fn findComputeQueueFamily(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: zvk.PhysicalDevice) !?u32 {
     var count: u32 = 0;
-    vk.instance.getPhysicalDeviceQueueFamilyProperties(physical_device, &count, null);
+    vk.instance.dispatch.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device, &count, null);
     if (count == 0) return null;
 
-    const families = try allocator.alloc(c.VkQueueFamilyProperties, count);
+    const families = try allocator.alloc(zvk.QueueFamilyProperties, count);
     defer allocator.free(families);
-    vk.instance.getPhysicalDeviceQueueFamilyProperties(physical_device, &count, families.ptr);
+    vk.instance.dispatch.vkGetPhysicalDeviceQueueFamilyProperties.?(physical_device, &count, families.ptr);
 
     for (families[0..count], 0..) |family, i| {
-        if ((family.queueFlags & c.VK_QUEUE_COMPUTE_BIT) != 0) return @intCast(i);
+        if (family.queue_flags.compute_bit) return @intCast(i);
     }
     return null;
 }
@@ -554,41 +398,41 @@ fn validateCoopDimensions(opts: Options) void {
     std.process.exit(2);
 }
 
-fn requireDeviceExtensions(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice, shader: ShaderMode) !void {
+fn requireDeviceExtensions(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: zvk.PhysicalDevice, shader: ShaderMode) !void {
     if (!shader.isCoop()) return;
 
     var count: u32 = 0;
-    try vkCheck(vk.instance.enumerateDeviceExtensionProperties(physical_device, null, &count, null));
-    const extensions = try allocator.alloc(c.VkExtensionProperties, count);
+    try vkCheck(vk.instance.dispatch.vkEnumerateDeviceExtensionProperties.?(physical_device, null, &count, null));
+    const extensions = try allocator.alloc(zvk.ExtensionProperties, count);
     defer allocator.free(extensions);
-    try vkCheck(vk.instance.enumerateDeviceExtensionProperties(physical_device, null, &count, extensions.ptr));
+    try vkCheck(vk.instance.dispatch.vkEnumerateDeviceExtensionProperties.?(physical_device, null, &count, extensions.ptr));
 
-    if (!hasDeviceExtension(extensions, c.VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME)) {
-        log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME });
+    if (!hasDeviceExtension(extensions, zvk.extensions.khr_cooperative_matrix.name)) {
+        log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), zvk.extensions.khr_cooperative_matrix.name });
         return error.RequiredDeviceExtensionMissing;
     }
-    if (shader.isNvCoop2() and !hasDeviceExtension(extensions, c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME)) {
-        log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME });
+    if (shader.isNvCoop2() and !hasDeviceExtension(extensions, zvk.extensions.nv_cooperative_matrix_2.name)) {
+        log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), zvk.extensions.nv_cooperative_matrix_2.name });
         return error.RequiredDeviceExtensionMissing;
     }
-    if (shader.isBf16() and !hasDeviceExtension(extensions, c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
-        log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME });
+    if (shader.isBf16() and !hasDeviceExtension(extensions, zvk.extensions.khr_shader_bfloat_16.name)) {
+        log.err("{s} requires {s}, but the selected device does not advertise it", .{ shader.name(), zvk.extensions.khr_shader_bfloat_16.name });
         return error.RequiredDeviceExtensionMissing;
     }
 }
 
-fn hasDeviceExtension(extensions: []const c.VkExtensionProperties, needle: []const u8) bool {
+fn hasDeviceExtension(extensions: []const zvk.ExtensionProperties, needle: []const u8) bool {
     for (extensions) |extension| {
-        const name = std.mem.sliceTo(&extension.extensionName, 0);
+        const name = std.mem.sliceTo(&extension.extension_name, 0);
         if (std.mem.eql(u8, name, needle)) return true;
     }
     return false;
 }
 
-fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice, shader: ShaderMode) !void {
+fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: zvk.PhysicalDevice, shader: ShaderMode) !void {
     if (shader.isNvCoop2()) return requireNvCoop2Property(vk, allocator, physical_device, shader);
 
-    const get_props = vk.instance.getCooperativeMatrixPropertiesKHR orelse {
+    const get_props = vk.instance.dispatch.vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR orelse {
         log.err("Vulkan loader does not expose vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR", .{});
         return error.RequiredDeviceExtensionMissing;
     };
@@ -600,22 +444,22 @@ fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical
         return error.RequiredCoopMatrixPropertyMissing;
     }
 
-    const props = try allocator.alloc(c.VkCooperativeMatrixPropertiesKHR, count);
+    const props = try allocator.alloc(zvk.CooperativeMatrixPropertiesKHR, count);
     defer allocator.free(props);
     for (props) |*prop| {
-        prop.* = std.mem.zeroes(c.VkCooperativeMatrixPropertiesKHR);
-        prop.sType = c.VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR;
+        prop.* = std.mem.zeroes(zvk.CooperativeMatrixPropertiesKHR);
+        prop.s_type = .cooperative_matrix_properties_khr;
     }
     try vkCheck(get_props(physical_device, &count, props.ptr));
 
     const input_type = shader.inputComponentType();
     for (props[0..count]) |prop| {
-        if (prop.MSize == 16 and prop.NSize == @as(u32, @intCast(shader.matrixTileN())) and prop.KSize == 16 and
-            prop.AType == input_type and prop.BType == input_type and
-            prop.CType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
-            prop.ResultType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
-            prop.saturatingAccumulation == c.VK_FALSE and
-            prop.scope == c.VK_SCOPE_SUBGROUP_KHR)
+        if (prop.m_size == 16 and prop.n_size == @as(u32, @intCast(shader.matrixTileN())) and prop.k_size == 16 and
+            prop.a_type == input_type and prop.b_type == input_type and
+            prop.c_type == zvk.ComponentTypeKHR.float32_khr and
+            prop.result_type == zvk.ComponentTypeKHR.float32_khr and
+            prop.saturating_accumulation == zvk.Bool32.false and
+            prop.scope == zvk.ScopeKHR.subgroup_khr)
         {
             return;
         }
@@ -624,73 +468,73 @@ fn requireCoopMatrixProperty(vk: *Vulkan, allocator: std.mem.Allocator, physical
     log.err("selected device lacks required {s} cooperative matrix property: M=16 N={d} K=16 A/B={d} C/Result=FLOAT32 scope=SUBGROUP", .{ shader.name(), shader.matrixTileN(), input_type });
     for (props[0..@min(count, 24)]) |prop| {
         log.err("  property: M={d} N={d} K={d} A={d} B={d} C={d} Result={d} sat={d} scope={d}", .{
-            prop.MSize,
-            prop.NSize,
-            prop.KSize,
-            prop.AType,
-            prop.BType,
-            prop.CType,
-            prop.ResultType,
-            prop.saturatingAccumulation,
+            prop.m_size,
+            prop.n_size,
+            prop.k_size,
+            prop.a_type,
+            prop.b_type,
+            prop.c_type,
+            prop.result_type,
+            prop.saturating_accumulation,
             prop.scope,
         });
     }
     return error.RequiredCoopMatrixPropertyMissing;
 }
 
-fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice, shader: ShaderMode) !void {
-    var base_props: c.VkPhysicalDeviceProperties = undefined;
-    vk.instance.getPhysicalDeviceProperties(physical_device, &base_props);
+fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: zvk.PhysicalDevice, shader: ShaderMode) !void {
+    var base_props: zvk.PhysicalDeviceProperties = undefined;
+    vk.instance.dispatch.vkGetPhysicalDeviceProperties.?(physical_device, &base_props);
     if (vendorId(&base_props) != 0x10de) {
         log.err("{s} is NVIDIA-specific and requires vendorID 0x10de; selected vendorID is 0x{x}", .{ shader.name(), vendorId(&base_props) });
         return error.RequiredDeviceFeatureMissing;
     }
 
-    var nv2_features: c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV);
-    nv2_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV;
-    var khr_features: c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR);
-    khr_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
-    khr_features.pNext = &nv2_features;
-    var features2: c.VkPhysicalDeviceFeatures2 = std.mem.zeroes(c.VkPhysicalDeviceFeatures2);
-    features2.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    features2.pNext = &khr_features;
-    vk.instance.getPhysicalDeviceFeatures2(physical_device, &features2);
+    var nv2_features: zvk.PhysicalDeviceCooperativeMatrix2FeaturesNV = std.mem.zeroes(zvk.PhysicalDeviceCooperativeMatrix2FeaturesNV);
+    nv2_features.s_type = .physical_device_cooperative_matrix_2_features_nv;
+    var khr_features: zvk.PhysicalDeviceCooperativeMatrixFeaturesKHR = std.mem.zeroes(zvk.PhysicalDeviceCooperativeMatrixFeaturesKHR);
+    khr_features.s_type = .physical_device_cooperative_matrix_features_khr;
+    khr_features.p_next = &nv2_features;
+    var features2: zvk.PhysicalDeviceFeatures2 = std.mem.zeroes(zvk.PhysicalDeviceFeatures2);
+    features2.s_type = .physical_device_features_2;
+    features2.p_next = &khr_features;
+    vk.instance.dispatch.vkGetPhysicalDeviceFeatures2.?(physical_device, &features2);
 
-    if (khr_features.cooperativeMatrix != c.VK_TRUE or
-        nv2_features.cooperativeMatrixWorkgroupScope != c.VK_TRUE or
-        nv2_features.cooperativeMatrixFlexibleDimensions != c.VK_TRUE or
-        nv2_features.cooperativeMatrixTensorAddressing != c.VK_TRUE or
-        nv2_features.cooperativeMatrixBlockLoads != c.VK_TRUE)
+    if (khr_features.cooperative_matrix != zvk.Bool32.true or
+        nv2_features.cooperative_matrix_workgroup_scope != zvk.Bool32.true or
+        nv2_features.cooperative_matrix_flexible_dimensions != zvk.Bool32.true or
+        nv2_features.cooperative_matrix_tensor_addressing != zvk.Bool32.true or
+        nv2_features.cooperative_matrix_block_loads != zvk.Bool32.true)
     {
         log.err("{s} requires KHR cooperative matrix plus NV coop2 workgroup scope, flexible dimensions, tensor addressing, and block loads", .{shader.name()});
         log.err("  features: khr={d} workgroup={d} flexible={d} tensor={d} block={d}", .{
-            khr_features.cooperativeMatrix,
-            nv2_features.cooperativeMatrixWorkgroupScope,
-            nv2_features.cooperativeMatrixFlexibleDimensions,
-            nv2_features.cooperativeMatrixTensorAddressing,
-            nv2_features.cooperativeMatrixBlockLoads,
+            khr_features.cooperative_matrix,
+            nv2_features.cooperative_matrix_workgroup_scope,
+            nv2_features.cooperative_matrix_flexible_dimensions,
+            nv2_features.cooperative_matrix_tensor_addressing,
+            nv2_features.cooperative_matrix_block_loads,
         });
         return error.RequiredDeviceFeatureMissing;
     }
 
-    var nv2_props: c.VkPhysicalDeviceCooperativeMatrix2PropertiesNV = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrix2PropertiesNV);
-    nv2_props.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_PROPERTIES_NV;
-    var properties2: c.VkPhysicalDeviceProperties2 = std.mem.zeroes(c.VkPhysicalDeviceProperties2);
-    properties2.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    properties2.pNext = &nv2_props;
-    vk.instance.getPhysicalDeviceProperties2(physical_device, &properties2);
+    var nv2_props: zvk.PhysicalDeviceCooperativeMatrix2PropertiesNV = std.mem.zeroes(zvk.PhysicalDeviceCooperativeMatrix2PropertiesNV);
+    nv2_props.s_type = .physical_device_cooperative_matrix_2_properties_nv;
+    var properties2: zvk.PhysicalDeviceProperties2 = std.mem.zeroes(zvk.PhysicalDeviceProperties2);
+    properties2.s_type = .physical_device_properties_2;
+    properties2.p_next = &nv2_props;
+    vk.instance.dispatch.vkGetPhysicalDeviceProperties2.?(physical_device, &properties2);
     const required_max_dim = @max(shader.outputTileM(), shader.outputTileN());
-    if (nv2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize < 256 or nv2_props.cooperativeMatrixFlexibleDimensionsMaxDimension < required_max_dim) {
+    if (nv2_props.cooperative_matrix_workgroup_scope_max_workgroup_size < 256 or nv2_props.cooperative_matrix_flexible_dimensions_max_dimension < required_max_dim) {
         log.err("{s} requires NV coop2 maxWorkgroupSize >= 256 and maxDimension >= {d}; got maxWorkgroupSize={d} maxDimension={d}", .{
             shader.name(),
             required_max_dim,
-            nv2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize,
-            nv2_props.cooperativeMatrixFlexibleDimensionsMaxDimension,
+            nv2_props.cooperative_matrix_workgroup_scope_max_workgroup_size,
+            nv2_props.cooperative_matrix_flexible_dimensions_max_dimension,
         });
         return error.RequiredCoopMatrixPropertyMissing;
     }
 
-    const get_props = vk.instance.getCooperativeMatrixFlexibleDimensionsPropertiesNV orelse {
+    const get_props = vk.instance.dispatch.vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV orelse {
         log.err("Vulkan loader does not expose vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV", .{});
         return error.RequiredDeviceExtensionMissing;
     };
@@ -702,11 +546,11 @@ fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
         return error.RequiredCoopMatrixPropertyMissing;
     }
 
-    const props = try allocator.alloc(c.VkCooperativeMatrixFlexibleDimensionsPropertiesNV, count);
+    const props = try allocator.alloc(zvk.CooperativeMatrixFlexibleDimensionsPropertiesNV, count);
     defer allocator.free(props);
     for (props) |*prop| {
-        prop.* = std.mem.zeroes(c.VkCooperativeMatrixFlexibleDimensionsPropertiesNV);
-        prop.sType = c.VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_FLEXIBLE_DIMENSIONS_PROPERTIES_NV;
+        prop.* = std.mem.zeroes(zvk.CooperativeMatrixFlexibleDimensionsPropertiesNV);
+        prop.s_type = .cooperative_matrix_flexible_dimensions_properties_nv;
     }
     try vkCheck(get_props(physical_device, &count, props.ptr));
 
@@ -714,13 +558,13 @@ fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
     const tile_m: u32 = @intCast(shader.outputTileM());
     const tile_n: u32 = @intCast(shader.outputTileN());
     for (props[0..count]) |prop| {
-        if (tile_m % prop.MGranularity == 0 and tile_n % prop.NGranularity == 0 and 16 % prop.KGranularity == 0 and
-            prop.AType == input_type and prop.BType == input_type and
-            prop.CType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
-            prop.ResultType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
-            prop.saturatingAccumulation == c.VK_FALSE and
-            prop.scope == c.VK_SCOPE_WORKGROUP_KHR and
-            prop.workgroupInvocations == 256)
+        if (tile_m % prop.m_granularity == 0 and tile_n % prop.n_granularity == 0 and 16 % prop.k_granularity == 0 and
+            prop.a_type == input_type and prop.b_type == input_type and
+            prop.c_type == zvk.ComponentTypeKHR.float32_khr and
+            prop.result_type == zvk.ComponentTypeKHR.float32_khr and
+            prop.saturating_accumulation == zvk.Bool32.false and
+            prop.scope == zvk.ScopeKHR.workgroup_khr and
+            prop.workgroup_invocations == 256)
         {
             return;
         }
@@ -729,152 +573,107 @@ fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
     log.err("selected device lacks required {s} NV coop2 property: tile={d}x{d}x16 A/B={d} C/Result=FLOAT32 scope=WORKGROUP invocations=256", .{ shader.name(), tile_m, tile_n, input_type });
     for (props[0..@min(count, 32)]) |prop| {
         log.err("  property: Mgran={d} Ngran={d} Kgran={d} A={d} B={d} C={d} Result={d} sat={d} scope={d} invocations={d}", .{
-            prop.MGranularity,
-            prop.NGranularity,
-            prop.KGranularity,
-            prop.AType,
-            prop.BType,
-            prop.CType,
-            prop.ResultType,
-            prop.saturatingAccumulation,
+            prop.m_granularity,
+            prop.n_granularity,
+            prop.k_granularity,
+            prop.a_type,
+            prop.b_type,
+            prop.c_type,
+            prop.result_type,
+            prop.saturating_accumulation,
             prop.scope,
-            prop.workgroupInvocations,
+            prop.workgroup_invocations,
         });
     }
     return error.RequiredCoopMatrixPropertyMissing;
 }
 
 const Device = struct {
-    handle: c.VkDevice,
-    fns: DeviceFns,
-    queue: c.VkQueue,
-    physical_device: c.VkPhysicalDevice,
+    handle: zvk.Device,
+    fns: zvk.DeviceWrapper,
+    queue: zvk.Queue,
+    physical_device: zvk.PhysicalDevice,
     queue_family: u32,
 
     fn deinit(self: *Device) void {
-        _ = self.fns.deviceWaitIdle(self.handle);
-        self.fns.destroyDevice(self.handle, null);
+        _ = self.fns.dispatch.vkDeviceWaitIdle.?(self.handle);
+        self.fns.dispatch.vkDestroyDevice.?(self.handle, null);
     }
 };
 
-fn createDevice(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: c.VkPhysicalDevice, queue_family: u32, shader: ShaderMode) !Device {
+fn createDevice(vk: *Vulkan, allocator: std.mem.Allocator, physical_device: zvk.PhysicalDevice, queue_family: u32, shader: ShaderMode) !Device {
     try requireDeviceExtensions(vk, allocator, physical_device, shader);
 
     var priorities = [_]f32{1.0};
-    var queue_info: c.VkDeviceQueueCreateInfo = std.mem.zeroes(c.VkDeviceQueueCreateInfo);
-    queue_info.sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_info.queueFamilyIndex = queue_family;
-    queue_info.queueCount = 1;
-    queue_info.pQueuePriorities = priorities[0..].ptr;
+    var queue_info: zvk.DeviceQueueCreateInfo = std.mem.zeroes(zvk.DeviceQueueCreateInfo);
+    queue_info.s_type = .device_queue_create_info;
+    queue_info.queue_family_index = queue_family;
+    queue_info.queue_count = 1;
+    queue_info.p_queue_priorities = priorities[0..].ptr;
 
-    var device_info: c.VkDeviceCreateInfo = std.mem.zeroes(c.VkDeviceCreateInfo);
-    device_info.sType = c.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_info.queueCreateInfoCount = 1;
-    var queue_infos = [_]c.VkDeviceQueueCreateInfo{queue_info};
-    device_info.pQueueCreateInfos = queue_infos[0..].ptr;
+    var device_info: zvk.DeviceCreateInfo = std.mem.zeroes(zvk.DeviceCreateInfo);
+    device_info.s_type = .device_create_info;
+    device_info.queue_create_info_count = 1;
+    var queue_infos = [_]zvk.DeviceQueueCreateInfo{queue_info};
+    device_info.p_queue_create_infos = queue_infos[0..].ptr;
 
     var extensions = [_][*:0]const u8{
-        c.VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,
-        c.VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME,
-        c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME,
+        zvk.extensions.khr_cooperative_matrix.name,
+        zvk.extensions.khr_shader_bfloat_16.name,
+        zvk.extensions.nv_cooperative_matrix_2.name,
     };
     if (shader.isCoop()) {
-        device_info.enabledExtensionCount = if (shader.isNvCoop2()) (if (shader.isBf16()) 3 else 2) else (if (shader.isBf16()) 2 else 1);
-        if (shader.isNvCoop2() and !shader.isBf16()) extensions[1] = c.VK_NV_COOPERATIVE_MATRIX_2_EXTENSION_NAME;
-        device_info.ppEnabledExtensionNames = extensions[0..device_info.enabledExtensionCount].ptr;
+        device_info.enabled_extension_count = if (shader.isNvCoop2()) (if (shader.isBf16()) 3 else 2) else (if (shader.isBf16()) 2 else 1);
+        if (shader.isNvCoop2() and !shader.isBf16()) extensions[1] = zvk.extensions.nv_cooperative_matrix_2.name;
+        device_info.pp_enabled_extension_names = extensions[0..device_info.enabled_extension_count].ptr;
     }
 
-    var coop_features: c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrixFeaturesKHR);
-    var nvcoop2_features: c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV = std.mem.zeroes(c.VkPhysicalDeviceCooperativeMatrix2FeaturesNV);
-    var storage16_features: c.VkPhysicalDevice16BitStorageFeatures = std.mem.zeroes(c.VkPhysicalDevice16BitStorageFeatures);
-    var f16_features: c.VkPhysicalDeviceShaderFloat16Int8Features = std.mem.zeroes(c.VkPhysicalDeviceShaderFloat16Int8Features);
-    var bf16_features: c.VkPhysicalDeviceShaderBfloat16FeaturesKHR = std.mem.zeroes(c.VkPhysicalDeviceShaderBfloat16FeaturesKHR);
+    var coop_features: zvk.PhysicalDeviceCooperativeMatrixFeaturesKHR = std.mem.zeroes(zvk.PhysicalDeviceCooperativeMatrixFeaturesKHR);
+    var nvcoop2_features: zvk.PhysicalDeviceCooperativeMatrix2FeaturesNV = std.mem.zeroes(zvk.PhysicalDeviceCooperativeMatrix2FeaturesNV);
+    var storage16_features: zvk.PhysicalDevice16BitStorageFeatures = std.mem.zeroes(zvk.PhysicalDevice16BitStorageFeatures);
+    var f16_features: zvk.PhysicalDeviceShaderFloat16Int8Features = std.mem.zeroes(zvk.PhysicalDeviceShaderFloat16Int8Features);
+    var bf16_features: zvk.PhysicalDeviceShaderBfloat16FeaturesKHR = std.mem.zeroes(zvk.PhysicalDeviceShaderBfloat16FeaturesKHR);
 
     if (shader.isCoop()) {
-        coop_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
-        coop_features.cooperativeMatrix = c.VK_TRUE;
+        coop_features.s_type = .physical_device_cooperative_matrix_features_khr;
+        coop_features.cooperative_matrix = zvk.Bool32.true;
         if (shader.isNvCoop2()) {
-            nvcoop2_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_2_FEATURES_NV;
-            nvcoop2_features.cooperativeMatrixWorkgroupScope = c.VK_TRUE;
-            nvcoop2_features.cooperativeMatrixFlexibleDimensions = c.VK_TRUE;
-            nvcoop2_features.cooperativeMatrixTensorAddressing = c.VK_TRUE;
-            nvcoop2_features.cooperativeMatrixBlockLoads = c.VK_TRUE;
-            coop_features.pNext = &nvcoop2_features;
+            nvcoop2_features.s_type = .physical_device_cooperative_matrix_2_features_nv;
+            nvcoop2_features.cooperative_matrix_workgroup_scope = zvk.Bool32.true;
+            nvcoop2_features.cooperative_matrix_flexible_dimensions = zvk.Bool32.true;
+            nvcoop2_features.cooperative_matrix_tensor_addressing = zvk.Bool32.true;
+            nvcoop2_features.cooperative_matrix_block_loads = zvk.Bool32.true;
+            coop_features.p_next = &nvcoop2_features;
         }
 
-        storage16_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
-        storage16_features.storageBuffer16BitAccess = c.VK_TRUE;
-        storage16_features.pNext = &coop_features;
+        storage16_features.s_type = .physical_device_16bit_storage_features;
+        storage16_features.storage_buffer_16_bit_access = zvk.Bool32.true;
+        storage16_features.p_next = &coop_features;
 
         if (shader.isF16()) {
-            f16_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
-            f16_features.shaderFloat16 = c.VK_TRUE;
-            f16_features.pNext = &storage16_features;
-            device_info.pNext = &f16_features;
+            f16_features.s_type = .physical_device_shader_float16_int8_features;
+            f16_features.shader_float_16 = zvk.Bool32.true;
+            f16_features.p_next = &storage16_features;
+            device_info.p_next = &f16_features;
         } else {
-            bf16_features.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_BFLOAT16_FEATURES_KHR;
-            bf16_features.shaderBFloat16Type = c.VK_TRUE;
-            bf16_features.shaderBFloat16CooperativeMatrix = c.VK_TRUE;
-            bf16_features.pNext = &storage16_features;
-            device_info.pNext = &bf16_features;
+            bf16_features.s_type = .physical_device_shader_bfloat16_features_khr;
+            bf16_features.shader_b_float_16_type = zvk.Bool32.true;
+            bf16_features.shader_b_float_16_cooperative_matrix = zvk.Bool32.true;
+            bf16_features.p_next = &storage16_features;
+            device_info.p_next = &bf16_features;
         }
     }
 
-    var handle: c.VkDevice = null;
-    const create_result = vk.instance.createDevice(physical_device, &device_info, null, &handle);
-    if (create_result == c.VK_ERROR_EXTENSION_NOT_PRESENT) return error.RequiredDeviceExtensionMissing;
-    if (create_result == c.VK_ERROR_FEATURE_NOT_PRESENT) return error.RequiredDeviceFeatureMissing;
+    var handle: zvk.Device = .null_handle;
+    const create_result = vk.instance.dispatch.vkCreateDevice.?(physical_device, &device_info, null, &handle);
+    if (create_result == zvk.Result.error_extension_not_present) return error.RequiredDeviceExtensionMissing;
+    if (create_result == zvk.Result.error_feature_not_present) return error.RequiredDeviceFeatureMissing;
     try vkCheck(create_result);
 
-    const fns: DeviceFns = .{
-        .destroyDevice = try loadDevice(VkDestroyDevice, vk.instance.getDeviceProcAddr, handle, "vkDestroyDevice"),
-        .getDeviceQueue = try loadDevice(VkGetDeviceQueue, vk.instance.getDeviceProcAddr, handle, "vkGetDeviceQueue"),
-        .createBuffer = try loadDevice(VkCreateBuffer, vk.instance.getDeviceProcAddr, handle, "vkCreateBuffer"),
-        .destroyBuffer = try loadDevice(VkDestroyBuffer, vk.instance.getDeviceProcAddr, handle, "vkDestroyBuffer"),
-        .getBufferMemoryRequirements = try loadDevice(VkGetBufferMemoryRequirements, vk.instance.getDeviceProcAddr, handle, "vkGetBufferMemoryRequirements"),
-        .allocateMemory = try loadDevice(VkAllocateMemory, vk.instance.getDeviceProcAddr, handle, "vkAllocateMemory"),
-        .freeMemory = try loadDevice(VkFreeMemory, vk.instance.getDeviceProcAddr, handle, "vkFreeMemory"),
-        .bindBufferMemory = try loadDevice(VkBindBufferMemory, vk.instance.getDeviceProcAddr, handle, "vkBindBufferMemory"),
-        .mapMemory = try loadDevice(VkMapMemory, vk.instance.getDeviceProcAddr, handle, "vkMapMemory"),
-        .unmapMemory = try loadDevice(VkUnmapMemory, vk.instance.getDeviceProcAddr, handle, "vkUnmapMemory"),
-        .createShaderModule = try loadDevice(VkCreateShaderModule, vk.instance.getDeviceProcAddr, handle, "vkCreateShaderModule"),
-        .destroyShaderModule = try loadDevice(VkDestroyShaderModule, vk.instance.getDeviceProcAddr, handle, "vkDestroyShaderModule"),
-        .createDescriptorSetLayout = try loadDevice(VkCreateDescriptorSetLayout, vk.instance.getDeviceProcAddr, handle, "vkCreateDescriptorSetLayout"),
-        .destroyDescriptorSetLayout = try loadDevice(VkDestroyDescriptorSetLayout, vk.instance.getDeviceProcAddr, handle, "vkDestroyDescriptorSetLayout"),
-        .createPipelineLayout = try loadDevice(VkCreatePipelineLayout, vk.instance.getDeviceProcAddr, handle, "vkCreatePipelineLayout"),
-        .destroyPipelineLayout = try loadDevice(VkDestroyPipelineLayout, vk.instance.getDeviceProcAddr, handle, "vkDestroyPipelineLayout"),
-        .createComputePipelines = try loadDevice(VkCreateComputePipelines, vk.instance.getDeviceProcAddr, handle, "vkCreateComputePipelines"),
-        .destroyPipeline = try loadDevice(VkDestroyPipeline, vk.instance.getDeviceProcAddr, handle, "vkDestroyPipeline"),
-        .createDescriptorPool = try loadDevice(VkCreateDescriptorPool, vk.instance.getDeviceProcAddr, handle, "vkCreateDescriptorPool"),
-        .destroyDescriptorPool = try loadDevice(VkDestroyDescriptorPool, vk.instance.getDeviceProcAddr, handle, "vkDestroyDescriptorPool"),
-        .allocateDescriptorSets = try loadDevice(VkAllocateDescriptorSets, vk.instance.getDeviceProcAddr, handle, "vkAllocateDescriptorSets"),
-        .updateDescriptorSets = try loadDevice(VkUpdateDescriptorSets, vk.instance.getDeviceProcAddr, handle, "vkUpdateDescriptorSets"),
-        .createCommandPool = try loadDevice(VkCreateCommandPool, vk.instance.getDeviceProcAddr, handle, "vkCreateCommandPool"),
-        .destroyCommandPool = try loadDevice(VkDestroyCommandPool, vk.instance.getDeviceProcAddr, handle, "vkDestroyCommandPool"),
-        .allocateCommandBuffers = try loadDevice(VkAllocateCommandBuffers, vk.instance.getDeviceProcAddr, handle, "vkAllocateCommandBuffers"),
-        .beginCommandBuffer = try loadDevice(VkBeginCommandBuffer, vk.instance.getDeviceProcAddr, handle, "vkBeginCommandBuffer"),
-        .endCommandBuffer = try loadDevice(VkEndCommandBuffer, vk.instance.getDeviceProcAddr, handle, "vkEndCommandBuffer"),
-        .cmdBindPipeline = try loadDevice(VkCmdBindPipeline, vk.instance.getDeviceProcAddr, handle, "vkCmdBindPipeline"),
-        .cmdBindDescriptorSets = try loadDevice(VkCmdBindDescriptorSets, vk.instance.getDeviceProcAddr, handle, "vkCmdBindDescriptorSets"),
-        .cmdPushConstants = try loadDevice(VkCmdPushConstants, vk.instance.getDeviceProcAddr, handle, "vkCmdPushConstants"),
-        .cmdCopyBuffer = try loadDevice(VkCmdCopyBuffer, vk.instance.getDeviceProcAddr, handle, "vkCmdCopyBuffer"),
-        .cmdPipelineBarrier = try loadDevice(VkCmdPipelineBarrier, vk.instance.getDeviceProcAddr, handle, "vkCmdPipelineBarrier"),
-        .cmdDispatch = try loadDevice(VkCmdDispatch, vk.instance.getDeviceProcAddr, handle, "vkCmdDispatch"),
-        .createFence = try loadDevice(VkCreateFence, vk.instance.getDeviceProcAddr, handle, "vkCreateFence"),
-        .destroyFence = try loadDevice(VkDestroyFence, vk.instance.getDeviceProcAddr, handle, "vkDestroyFence"),
-        .createQueryPool = try loadDevice(VkCreateQueryPool, vk.instance.getDeviceProcAddr, handle, "vkCreateQueryPool"),
-        .destroyQueryPool = try loadDevice(VkDestroyQueryPool, vk.instance.getDeviceProcAddr, handle, "vkDestroyQueryPool"),
-        .getQueryPoolResults = try loadDevice(VkGetQueryPoolResults, vk.instance.getDeviceProcAddr, handle, "vkGetQueryPoolResults"),
-        .cmdResetQueryPool = try loadDevice(VkCmdResetQueryPool, vk.instance.getDeviceProcAddr, handle, "vkCmdResetQueryPool"),
-        .cmdWriteTimestamp = try loadDevice(VkCmdWriteTimestamp, vk.instance.getDeviceProcAddr, handle, "vkCmdWriteTimestamp"),
-        .queueSubmit = try loadDevice(VkQueueSubmit, vk.instance.getDeviceProcAddr, handle, "vkQueueSubmit"),
-        .waitForFences = try loadDevice(VkWaitForFences, vk.instance.getDeviceProcAddr, handle, "vkWaitForFences"),
-        .resetFences = try loadDevice(VkResetFences, vk.instance.getDeviceProcAddr, handle, "vkResetFences"),
-        .deviceWaitIdle = try loadDevice(VkDeviceWaitIdle, vk.instance.getDeviceProcAddr, handle, "vkDeviceWaitIdle"),
-    };
+    const fns = zvk.DeviceWrapper.load(handle, vk.instance.dispatch.vkGetDeviceProcAddr.?);
 
-    var queue: c.VkQueue = null;
-    fns.getDeviceQueue(handle, queue_family, 0, &queue);
+    var queue: zvk.Queue = .null_handle;
+    fns.dispatch.vkGetDeviceQueue.?(handle, queue_family, 0, &queue);
 
     return .{
         .handle = handle,
@@ -898,11 +697,11 @@ fn runScalarMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     const b_len = opts.k * opts.n;
     const c_len = opts.m * opts.n;
 
-    var a = try createBuffer(vk, device, a_len * @sizeOf(f32), c.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    var a = try createBuffer(vk, device, a_len * @sizeOf(f32), .{ .storage_buffer_bit = true }, .{ .host_visible_bit = true, .host_coherent_bit = true }, true);
     defer destroyBuffer(device, a);
-    var b = try createBuffer(vk, device, b_len * @sizeOf(f32), c.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    var b = try createBuffer(vk, device, b_len * @sizeOf(f32), .{ .storage_buffer_bit = true }, .{ .host_visible_bit = true, .host_coherent_bit = true }, true);
     defer destroyBuffer(device, b);
-    var out = try createBuffer(vk, device, c_len * @sizeOf(f32), c.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    var out = try createBuffer(vk, device, c_len * @sizeOf(f32), .{ .storage_buffer_bit = true }, .{ .host_visible_bit = true, .host_coherent_bit = true }, true);
     defer destroyBuffer(device, out);
 
     const a_values = a.slice(f32);
@@ -913,37 +712,37 @@ fn runScalarMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     @memset(out_values, 0);
 
     const shader_module = try createShaderModule(device, opts.shader);
-    defer device.fns.destroyShaderModule(device.handle, shader_module, null);
+    defer device.fns.dispatch.vkDestroyShaderModule.?(device.handle, shader_module, null);
 
     const descriptor_layout = try createDescriptorSetLayout(device);
-    defer device.fns.destroyDescriptorSetLayout(device.handle, descriptor_layout, null);
+    defer device.fns.dispatch.vkDestroyDescriptorSetLayout.?(device.handle, descriptor_layout, null);
 
     const pipeline_layout = try createPipelineLayout(device, descriptor_layout);
-    defer device.fns.destroyPipelineLayout(device.handle, pipeline_layout, null);
+    defer device.fns.dispatch.vkDestroyPipelineLayout.?(device.handle, pipeline_layout, null);
 
     const pipeline = try createPipeline(device, pipeline_layout, shader_module);
-    defer device.fns.destroyPipeline(device.handle, pipeline, null);
+    defer device.fns.dispatch.vkDestroyPipeline.?(device.handle, pipeline, null);
 
     const descriptor_pool = try createDescriptorPool(device);
-    defer device.fns.destroyDescriptorPool(device.handle, descriptor_pool, null);
+    defer device.fns.dispatch.vkDestroyDescriptorPool.?(device.handle, descriptor_pool, null);
 
     const descriptor_set = try allocateDescriptorSet(device, descriptor_pool, descriptor_layout);
     updateDescriptorSet(device, descriptor_set, a, b, out);
 
     const command_pool = try createCommandPool(device);
-    defer device.fns.destroyCommandPool(device.handle, command_pool, null);
+    defer device.fns.dispatch.vkDestroyCommandPool.?(device.handle, command_pool, null);
 
     const command_buffer = try allocateCommandBuffer(device, command_pool);
     try recordCommands(device, command_buffer, pipeline, pipeline_layout, descriptor_set, opts);
 
     const timed_cmd = try allocateCommandBuffer(device, command_pool);
-    var query_pool: c.VkQueryPool = null;
+    var query_pool: zvk.QueryPool = .null_handle;
     if (opts.timing == .gpu_timestamp) query_pool = try createTimestampQueryPool(device);
-    defer if (query_pool != null) device.fns.destroyQueryPool(device.handle, query_pool, null);
+    defer if (query_pool != .null_handle) device.fns.dispatch.vkDestroyQueryPool.?(device.handle, query_pool, null);
     if (opts.timing == .gpu_timestamp) try recordTimedCommands(device, timed_cmd, pipeline, pipeline_layout, descriptor_set, opts, query_pool);
 
     const fence = try createFence(device);
-    defer device.fns.destroyFence(device.handle, fence, null);
+    defer device.fns.dispatch.vkDestroyFence.?(device.handle, fence, null);
 
     const timing = try timeDispatches(vk, device, command_buffer, timed_cmd, query_pool, fence, opts);
 
@@ -956,18 +755,18 @@ fn runCoopMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     const b_len = opts.k * opts.n;
     const c_len = opts.m * opts.n;
 
-    var a_stage = try createBuffer(vk, device, a_len * @sizeOf(u16), c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    var a_stage = try createBuffer(vk, device, a_len * @sizeOf(u16), .{ .transfer_src_bit = true }, .{ .host_visible_bit = true, .host_coherent_bit = true }, true);
     defer destroyBuffer(device, a_stage);
-    var b_stage = try createBuffer(vk, device, b_len * @sizeOf(u16), c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    var b_stage = try createBuffer(vk, device, b_len * @sizeOf(u16), .{ .transfer_src_bit = true }, .{ .host_visible_bit = true, .host_coherent_bit = true }, true);
     defer destroyBuffer(device, b_stage);
-    var out_stage = try createBuffer(vk, device, c_len * @sizeOf(f32), c.VK_BUFFER_USAGE_TRANSFER_DST_BIT, c.VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | c.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    var out_stage = try createBuffer(vk, device, c_len * @sizeOf(f32), .{ .transfer_dst_bit = true }, .{ .host_visible_bit = true, .host_coherent_bit = true }, true);
     defer destroyBuffer(device, out_stage);
 
-    const a_dev = try createBuffer(vk, device, a_stage.bytes(), c.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | c.VK_BUFFER_USAGE_TRANSFER_DST_BIT, c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
+    const a_dev = try createBuffer(vk, device, a_stage.bytes(), .{ .storage_buffer_bit = true, .transfer_dst_bit = true }, .{ .device_local_bit = true }, false);
     defer destroyBuffer(device, a_dev);
-    const b_dev = try createBuffer(vk, device, b_stage.bytes(), c.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | c.VK_BUFFER_USAGE_TRANSFER_DST_BIT, c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
+    const b_dev = try createBuffer(vk, device, b_stage.bytes(), .{ .storage_buffer_bit = true, .transfer_dst_bit = true }, .{ .device_local_bit = true }, false);
     defer destroyBuffer(device, b_dev);
-    const out_dev = try createBuffer(vk, device, out_stage.bytes(), c.VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | c.VK_BUFFER_USAGE_TRANSFER_SRC_BIT, c.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
+    const out_dev = try createBuffer(vk, device, out_stage.bytes(), .{ .storage_buffer_bit = true, .transfer_src_bit = true }, .{ .device_local_bit = true }, false);
     defer destroyBuffer(device, out_dev);
 
     const a_bits = a_stage.slice(u16);
@@ -978,25 +777,25 @@ fn runCoopMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     @memset(out_values, 0);
 
     const shader_module = try createShaderModule(device, opts.shader);
-    defer device.fns.destroyShaderModule(device.handle, shader_module, null);
+    defer device.fns.dispatch.vkDestroyShaderModule.?(device.handle, shader_module, null);
 
     const descriptor_layout = try createDescriptorSetLayout(device);
-    defer device.fns.destroyDescriptorSetLayout(device.handle, descriptor_layout, null);
+    defer device.fns.dispatch.vkDestroyDescriptorSetLayout.?(device.handle, descriptor_layout, null);
 
     const pipeline_layout = try createPipelineLayout(device, descriptor_layout);
-    defer device.fns.destroyPipelineLayout(device.handle, pipeline_layout, null);
+    defer device.fns.dispatch.vkDestroyPipelineLayout.?(device.handle, pipeline_layout, null);
 
     const pipeline = try createPipeline(device, pipeline_layout, shader_module);
-    defer device.fns.destroyPipeline(device.handle, pipeline, null);
+    defer device.fns.dispatch.vkDestroyPipeline.?(device.handle, pipeline, null);
 
     const descriptor_pool = try createDescriptorPool(device);
-    defer device.fns.destroyDescriptorPool(device.handle, descriptor_pool, null);
+    defer device.fns.dispatch.vkDestroyDescriptorPool.?(device.handle, descriptor_pool, null);
 
     const descriptor_set = try allocateDescriptorSet(device, descriptor_pool, descriptor_layout);
     updateDescriptorSet(device, descriptor_set, a_dev, b_dev, out_dev);
 
     const command_pool = try createCommandPool(device);
-    defer device.fns.destroyCommandPool(device.handle, command_pool, null);
+    defer device.fns.dispatch.vkDestroyCommandPool.?(device.handle, command_pool, null);
 
     const upload_cmd = try allocateCommandBuffer(device, command_pool);
     const compute_cmd = try allocateCommandBuffer(device, command_pool);
@@ -1004,14 +803,14 @@ fn runCoopMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     const download_cmd = try allocateCommandBuffer(device, command_pool);
     try recordUploadCommands(device, upload_cmd, a_stage, a_dev, b_stage, b_dev);
     try recordCommands(device, compute_cmd, pipeline, pipeline_layout, descriptor_set, opts);
-    var query_pool: c.VkQueryPool = null;
+    var query_pool: zvk.QueryPool = .null_handle;
     if (opts.timing == .gpu_timestamp) query_pool = try createTimestampQueryPool(device);
-    defer if (query_pool != null) device.fns.destroyQueryPool(device.handle, query_pool, null);
+    defer if (query_pool != .null_handle) device.fns.dispatch.vkDestroyQueryPool.?(device.handle, query_pool, null);
     if (opts.timing == .gpu_timestamp) try recordTimedCommands(device, timed_cmd, pipeline, pipeline_layout, descriptor_set, opts, query_pool);
     try recordDownloadCommands(device, download_cmd, out_dev, out_stage);
 
     const fence = try createFence(device);
-    defer device.fns.destroyFence(device.handle, fence, null);
+    defer device.fns.dispatch.vkDestroyFence.?(device.handle, fence, null);
 
     try submitCommand(device, upload_cmd, fence);
     const timing = try timeDispatches(vk, device, compute_cmd, timed_cmd, query_pool, fence, opts);
@@ -1021,37 +820,37 @@ fn runCoopMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     printResult(opts, timing);
 }
 
-fn createBuffer(vk: *Vulkan, device: *Device, byte_len: usize, usage: c.VkBufferUsageFlags, required: c.VkMemoryPropertyFlags, map: bool) !Buffer {
-    var info: c.VkBufferCreateInfo = std.mem.zeroes(c.VkBufferCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+fn createBuffer(vk: *Vulkan, device: *Device, byte_len: usize, usage: zvk.BufferUsageFlags, required: zvk.MemoryPropertyFlags, map: bool) !Buffer {
+    var info: zvk.BufferCreateInfo = std.mem.zeroes(zvk.BufferCreateInfo);
+    info.s_type = .buffer_create_info;
     info.size = byte_len;
     info.usage = usage;
-    info.sharingMode = c.VK_SHARING_MODE_EXCLUSIVE;
+    info.sharing_mode = zvk.SharingMode.exclusive;
 
-    var handle: c.VkBuffer = null;
-    try vkCheck(device.fns.createBuffer(device.handle, &info, null, &handle));
-    errdefer device.fns.destroyBuffer(device.handle, handle, null);
+    var handle: zvk.Buffer = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreateBuffer.?(device.handle, &info, null, &handle));
+    errdefer device.fns.dispatch.vkDestroyBuffer.?(device.handle, handle, null);
 
-    var reqs: c.VkMemoryRequirements = undefined;
-    device.fns.getBufferMemoryRequirements(device.handle, handle, &reqs);
+    var reqs: zvk.MemoryRequirements = undefined;
+    device.fns.dispatch.vkGetBufferMemoryRequirements.?(device.handle, handle, &reqs);
 
-    const memory_type = try findMemoryType(vk, device.physical_device, reqs.memoryTypeBits, required);
+    const memory_type = try findMemoryType(vk, device.physical_device, reqs.memory_type_bits, required);
 
-    var alloc: c.VkMemoryAllocateInfo = std.mem.zeroes(c.VkMemoryAllocateInfo);
-    alloc.sType = c.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc.allocationSize = reqs.size;
-    alloc.memoryTypeIndex = memory_type;
+    var alloc: zvk.MemoryAllocateInfo = std.mem.zeroes(zvk.MemoryAllocateInfo);
+    alloc.s_type = .memory_allocate_info;
+    alloc.allocation_size = reqs.size;
+    alloc.memory_type_index = memory_type;
 
-    var memory: c.VkDeviceMemory = null;
-    try vkCheck(device.fns.allocateMemory(device.handle, &alloc, null, &memory));
-    errdefer device.fns.freeMemory(device.handle, memory, null);
+    var memory: zvk.DeviceMemory = .null_handle;
+    try vkCheck(device.fns.dispatch.vkAllocateMemory.?(device.handle, &alloc, null, &memory));
+    errdefer device.fns.dispatch.vkFreeMemory.?(device.handle, memory, null);
 
-    try vkCheck(device.fns.bindBufferMemory(device.handle, handle, memory, 0));
+    try vkCheck(device.fns.dispatch.vkBindBufferMemory.?(device.handle, handle, memory, 0));
 
     var mapped: ?[*]u8 = null;
     if (map) {
         var mapped_raw: ?*anyopaque = null;
-        try vkCheck(device.fns.mapMemory(device.handle, memory, 0, alloc.allocationSize, 0, &mapped_raw));
+        try vkCheck(device.fns.dispatch.vkMapMemory.?(device.handle, memory, 0, alloc.allocation_size, .{}, &mapped_raw));
         mapped = @ptrCast(mapped_raw.?);
     }
 
@@ -1059,23 +858,23 @@ fn createBuffer(vk: *Vulkan, device: *Device, byte_len: usize, usage: c.VkBuffer
 }
 
 fn destroyBuffer(device: *Device, buffer: Buffer) void {
-    if (buffer.mapped != null) device.fns.unmapMemory(device.handle, buffer.memory);
-    device.fns.destroyBuffer(device.handle, buffer.handle, null);
-    device.fns.freeMemory(device.handle, buffer.memory, null);
+    if (buffer.mapped != null) device.fns.dispatch.vkUnmapMemory.?(device.handle, buffer.memory);
+    device.fns.dispatch.vkDestroyBuffer.?(device.handle, buffer.handle, null);
+    device.fns.dispatch.vkFreeMemory.?(device.handle, buffer.memory, null);
 }
 
-fn findMemoryType(vk: *Vulkan, physical_device: c.VkPhysicalDevice, type_bits: u32, required: c.VkMemoryPropertyFlags) !u32 {
-    var props: c.VkPhysicalDeviceMemoryProperties = undefined;
-    vk.instance.getPhysicalDeviceMemoryProperties(physical_device, &props);
+fn findMemoryType(vk: *Vulkan, physical_device: zvk.PhysicalDevice, type_bits: u32, required: zvk.MemoryPropertyFlags) !u32 {
+    var props: zvk.PhysicalDeviceMemoryProperties = undefined;
+    vk.instance.dispatch.vkGetPhysicalDeviceMemoryProperties.?(physical_device, &props);
 
-    for (props.memoryTypes[0..props.memoryTypeCount], 0..) |mem_type, i| {
+    for (props.memory_types[0..props.memory_type_count], 0..) |mem_type, i| {
         const bit: u32 = @as(u32, 1) << @intCast(i);
-        if ((type_bits & bit) != 0 and (mem_type.propertyFlags & required) == required) return @intCast(i);
+        if ((type_bits & bit) != 0 and mem_type.property_flags.contains(required)) return @intCast(i);
     }
     return error.MemoryTypeNotFound;
 }
 
-fn createShaderModule(device: *Device, shader: ShaderMode) !c.VkShaderModule {
+fn createShaderModule(device: *Device, shader: ShaderMode) !zvk.ShaderModule {
     const words = switch (shader) {
         .zig => matmul_zig_spv.words[0..],
         .coop_bf16 => matmul_coop_bf16_spv.words[0..],
@@ -1089,161 +888,161 @@ fn createShaderModule(device: *Device, shader: ShaderMode) !c.VkShaderModule {
         .nvcoop2_square_f16 => matmul_nvcoop2_square_f16_spv.words[0..],
     };
 
-    var info: c.VkShaderModuleCreateInfo = std.mem.zeroes(c.VkShaderModuleCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    info.codeSize = words.len * @sizeOf(u32);
-    info.pCode = words.ptr;
+    var info: zvk.ShaderModuleCreateInfo = std.mem.zeroes(zvk.ShaderModuleCreateInfo);
+    info.s_type = .shader_module_create_info;
+    info.code_size = words.len * @sizeOf(u32);
+    info.p_code = words.ptr;
 
-    var module: c.VkShaderModule = null;
-    try vkCheck(device.fns.createShaderModule(device.handle, &info, null, &module));
+    var module: zvk.ShaderModule = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreateShaderModule.?(device.handle, &info, null, &module));
     return module;
 }
 
-fn createDescriptorSetLayout(device: *Device) !c.VkDescriptorSetLayout {
-    var bindings: [3]c.VkDescriptorSetLayoutBinding = undefined;
+fn createDescriptorSetLayout(device: *Device) !zvk.DescriptorSetLayout {
+    var bindings: [3]zvk.DescriptorSetLayoutBinding = undefined;
     for (&bindings, 0..) |*binding, i| {
-        binding.* = std.mem.zeroes(c.VkDescriptorSetLayoutBinding);
+        binding.* = std.mem.zeroes(zvk.DescriptorSetLayoutBinding);
         binding.binding = @intCast(i);
-        binding.descriptorType = c.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        binding.descriptorCount = 1;
-        binding.stageFlags = c.VK_SHADER_STAGE_COMPUTE_BIT;
+        binding.descriptor_type = zvk.DescriptorType.storage_buffer;
+        binding.descriptor_count = 1;
+        binding.stage_flags = zvk.ShaderStageFlags{ .compute_bit = true };
     }
 
-    var info: c.VkDescriptorSetLayoutCreateInfo = std.mem.zeroes(c.VkDescriptorSetLayoutCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    info.bindingCount = bindings.len;
-    info.pBindings = bindings[0..].ptr;
+    var info: zvk.DescriptorSetLayoutCreateInfo = std.mem.zeroes(zvk.DescriptorSetLayoutCreateInfo);
+    info.s_type = .descriptor_set_layout_create_info;
+    info.binding_count = bindings.len;
+    info.p_bindings = bindings[0..].ptr;
 
-    var layout: c.VkDescriptorSetLayout = null;
-    try vkCheck(device.fns.createDescriptorSetLayout(device.handle, &info, null, &layout));
+    var layout: zvk.DescriptorSetLayout = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreateDescriptorSetLayout.?(device.handle, &info, null, &layout));
     return layout;
 }
 
-fn createPipelineLayout(device: *Device, descriptor_layout: c.VkDescriptorSetLayout) !c.VkPipelineLayout {
-    var push: c.VkPushConstantRange = std.mem.zeroes(c.VkPushConstantRange);
-    push.stageFlags = c.VK_SHADER_STAGE_COMPUTE_BIT;
+fn createPipelineLayout(device: *Device, descriptor_layout: zvk.DescriptorSetLayout) !zvk.PipelineLayout {
+    var push: zvk.PushConstantRange = std.mem.zeroes(zvk.PushConstantRange);
+    push.stage_flags = zvk.ShaderStageFlags{ .compute_bit = true };
     push.offset = 0;
     push.size = @sizeOf(PushConstants);
 
-    var info: c.VkPipelineLayoutCreateInfo = std.mem.zeroes(c.VkPipelineLayoutCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    var layouts = [_]c.VkDescriptorSetLayout{descriptor_layout};
-    var ranges = [_]c.VkPushConstantRange{push};
-    info.setLayoutCount = 1;
-    info.pSetLayouts = layouts[0..].ptr;
-    info.pushConstantRangeCount = 1;
-    info.pPushConstantRanges = ranges[0..].ptr;
+    var info: zvk.PipelineLayoutCreateInfo = std.mem.zeroes(zvk.PipelineLayoutCreateInfo);
+    info.s_type = .pipeline_layout_create_info;
+    var layouts = [_]zvk.DescriptorSetLayout{descriptor_layout};
+    var ranges = [_]zvk.PushConstantRange{push};
+    info.set_layout_count = 1;
+    info.p_set_layouts = layouts[0..].ptr;
+    info.push_constant_range_count = 1;
+    info.p_push_constant_ranges = ranges[0..].ptr;
 
-    var layout: c.VkPipelineLayout = null;
-    try vkCheck(device.fns.createPipelineLayout(device.handle, &info, null, &layout));
+    var layout: zvk.PipelineLayout = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreatePipelineLayout.?(device.handle, &info, null, &layout));
     return layout;
 }
 
-fn createPipeline(device: *Device, pipeline_layout: c.VkPipelineLayout, shader_module: c.VkShaderModule) !c.VkPipeline {
-    var stage: c.VkPipelineShaderStageCreateInfo = std.mem.zeroes(c.VkPipelineShaderStageCreateInfo);
-    stage.sType = c.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stage.stage = c.VK_SHADER_STAGE_COMPUTE_BIT;
+fn createPipeline(device: *Device, pipeline_layout: zvk.PipelineLayout, shader_module: zvk.ShaderModule) !zvk.Pipeline {
+    var stage: zvk.PipelineShaderStageCreateInfo = std.mem.zeroes(zvk.PipelineShaderStageCreateInfo);
+    stage.s_type = .pipeline_shader_stage_create_info;
+    stage.stage = zvk.ShaderStageFlags{ .compute_bit = true };
     stage.module = shader_module;
-    stage.pName = "main";
+    stage.p_name = "main";
 
-    var info: c.VkComputePipelineCreateInfo = std.mem.zeroes(c.VkComputePipelineCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    var info: zvk.ComputePipelineCreateInfo = std.mem.zeroes(zvk.ComputePipelineCreateInfo);
+    info.s_type = .compute_pipeline_create_info;
     info.stage = stage;
     info.layout = pipeline_layout;
 
-    var infos = [_]c.VkComputePipelineCreateInfo{info};
-    var pipelines = [_]c.VkPipeline{null};
-    try vkCheck(device.fns.createComputePipelines(device.handle, null, 1, infos[0..].ptr, null, pipelines[0..].ptr));
+    var infos = [_]zvk.ComputePipelineCreateInfo{info};
+    var pipelines = [_]zvk.Pipeline{.null_handle};
+    try vkCheck(device.fns.dispatch.vkCreateComputePipelines.?(device.handle, .null_handle, 1, infos[0..].ptr, null, pipelines[0..].ptr));
     return pipelines[0];
 }
 
-fn createDescriptorPool(device: *Device) !c.VkDescriptorPool {
-    var size: c.VkDescriptorPoolSize = std.mem.zeroes(c.VkDescriptorPoolSize);
-    size.type = c.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    size.descriptorCount = 3;
+fn createDescriptorPool(device: *Device) !zvk.DescriptorPool {
+    var size: zvk.DescriptorPoolSize = std.mem.zeroes(zvk.DescriptorPoolSize);
+    size.type = zvk.DescriptorType.storage_buffer;
+    size.descriptor_count = 3;
 
-    var info: c.VkDescriptorPoolCreateInfo = std.mem.zeroes(c.VkDescriptorPoolCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    info.maxSets = 1;
-    info.poolSizeCount = 1;
-    var sizes = [_]c.VkDescriptorPoolSize{size};
-    info.pPoolSizes = sizes[0..].ptr;
+    var info: zvk.DescriptorPoolCreateInfo = std.mem.zeroes(zvk.DescriptorPoolCreateInfo);
+    info.s_type = .descriptor_pool_create_info;
+    info.max_sets = 1;
+    info.pool_size_count = 1;
+    var sizes = [_]zvk.DescriptorPoolSize{size};
+    info.p_pool_sizes = sizes[0..].ptr;
 
-    var pool: c.VkDescriptorPool = null;
-    try vkCheck(device.fns.createDescriptorPool(device.handle, &info, null, &pool));
+    var pool: zvk.DescriptorPool = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreateDescriptorPool.?(device.handle, &info, null, &pool));
     return pool;
 }
 
-fn allocateDescriptorSet(device: *Device, pool: c.VkDescriptorPool, layout: c.VkDescriptorSetLayout) !c.VkDescriptorSet {
-    var info: c.VkDescriptorSetAllocateInfo = std.mem.zeroes(c.VkDescriptorSetAllocateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    info.descriptorPool = pool;
-    info.descriptorSetCount = 1;
-    var layouts = [_]c.VkDescriptorSetLayout{layout};
-    info.pSetLayouts = layouts[0..].ptr;
+fn allocateDescriptorSet(device: *Device, pool: zvk.DescriptorPool, layout: zvk.DescriptorSetLayout) !zvk.DescriptorSet {
+    var info: zvk.DescriptorSetAllocateInfo = std.mem.zeroes(zvk.DescriptorSetAllocateInfo);
+    info.s_type = .descriptor_set_allocate_info;
+    info.descriptor_pool = pool;
+    info.descriptor_set_count = 1;
+    var layouts = [_]zvk.DescriptorSetLayout{layout};
+    info.p_set_layouts = layouts[0..].ptr;
 
-    var sets = [_]c.VkDescriptorSet{null};
-    try vkCheck(device.fns.allocateDescriptorSets(device.handle, &info, sets[0..].ptr));
+    var sets = [_]zvk.DescriptorSet{.null_handle};
+    try vkCheck(device.fns.dispatch.vkAllocateDescriptorSets.?(device.handle, &info, sets[0..].ptr));
     return sets[0];
 }
 
-fn updateDescriptorSet(device: *Device, set: c.VkDescriptorSet, a: Buffer, b: Buffer, out: Buffer) void {
-    var infos = [_]c.VkDescriptorBufferInfo{
+fn updateDescriptorSet(device: *Device, set: zvk.DescriptorSet, a: Buffer, b: Buffer, out: Buffer) void {
+    var infos = [_]zvk.DescriptorBufferInfo{
         .{ .buffer = a.handle, .offset = 0, .range = a.bytes() },
         .{ .buffer = b.handle, .offset = 0, .range = b.bytes() },
         .{ .buffer = out.handle, .offset = 0, .range = out.bytes() },
     };
-    var writes: [3]c.VkWriteDescriptorSet = undefined;
+    var writes: [3]zvk.WriteDescriptorSet = undefined;
     for (&writes, 0..) |*write, i| {
-        write.* = std.mem.zeroes(c.VkWriteDescriptorSet);
-        write.sType = c.VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = set;
-        write.dstBinding = @intCast(i);
-        write.descriptorCount = 1;
-        write.descriptorType = c.VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        write.pBufferInfo = @ptrCast(&infos[i]);
+        write.* = std.mem.zeroes(zvk.WriteDescriptorSet);
+        write.s_type = .write_descriptor_set;
+        write.dst_set = set;
+        write.dst_binding = @intCast(i);
+        write.descriptor_count = 1;
+        write.descriptor_type = zvk.DescriptorType.storage_buffer;
+        write.p_buffer_info = @ptrCast(&infos[i]);
     }
-    device.fns.updateDescriptorSets(device.handle, writes.len, &writes, 0, null);
+    device.fns.dispatch.vkUpdateDescriptorSets.?(device.handle, writes.len, &writes, 0, null);
 }
 
-fn createCommandPool(device: *Device) !c.VkCommandPool {
-    var info: c.VkCommandPoolCreateInfo = std.mem.zeroes(c.VkCommandPoolCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    info.queueFamilyIndex = device.queue_family;
+fn createCommandPool(device: *Device) !zvk.CommandPool {
+    var info: zvk.CommandPoolCreateInfo = std.mem.zeroes(zvk.CommandPoolCreateInfo);
+    info.s_type = .command_pool_create_info;
+    info.queue_family_index = device.queue_family;
 
-    var pool: c.VkCommandPool = null;
-    try vkCheck(device.fns.createCommandPool(device.handle, &info, null, &pool));
+    var pool: zvk.CommandPool = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreateCommandPool.?(device.handle, &info, null, &pool));
     return pool;
 }
 
-fn allocateCommandBuffer(device: *Device, pool: c.VkCommandPool) !c.VkCommandBuffer {
-    var info: c.VkCommandBufferAllocateInfo = std.mem.zeroes(c.VkCommandBufferAllocateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    info.commandPool = pool;
-    info.level = c.VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    info.commandBufferCount = 1;
+fn allocateCommandBuffer(device: *Device, pool: zvk.CommandPool) !zvk.CommandBuffer {
+    var info: zvk.CommandBufferAllocateInfo = std.mem.zeroes(zvk.CommandBufferAllocateInfo);
+    info.s_type = .command_buffer_allocate_info;
+    info.command_pool = pool;
+    info.level = zvk.CommandBufferLevel.primary;
+    info.command_buffer_count = 1;
 
-    var buffers = [_]c.VkCommandBuffer{null};
-    try vkCheck(device.fns.allocateCommandBuffers(device.handle, &info, buffers[0..].ptr));
+    var buffers = [_]zvk.CommandBuffer{.null_handle};
+    try vkCheck(device.fns.dispatch.vkAllocateCommandBuffers.?(device.handle, &info, buffers[0..].ptr));
     return buffers[0];
 }
 
-fn recordCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: c.VkPipeline, pipeline_layout: c.VkPipelineLayout, descriptor_set: c.VkDescriptorSet, opts: Options) !void {
-    return recordRepeatedCommands(device, command_buffer, pipeline, pipeline_layout, descriptor_set, opts, 1, null);
+fn recordCommands(device: *Device, command_buffer: zvk.CommandBuffer, pipeline: zvk.Pipeline, pipeline_layout: zvk.PipelineLayout, descriptor_set: zvk.DescriptorSet, opts: Options) !void {
+    return recordRepeatedCommands(device, command_buffer, pipeline, pipeline_layout, descriptor_set, opts, 1, .null_handle);
 }
 
-fn recordTimedCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: c.VkPipeline, pipeline_layout: c.VkPipelineLayout, descriptor_set: c.VkDescriptorSet, opts: Options, query_pool: c.VkQueryPool) !void {
+fn recordTimedCommands(device: *Device, command_buffer: zvk.CommandBuffer, pipeline: zvk.Pipeline, pipeline_layout: zvk.PipelineLayout, descriptor_set: zvk.DescriptorSet, opts: Options, query_pool: zvk.QueryPool) !void {
     return recordRepeatedCommands(device, command_buffer, pipeline, pipeline_layout, descriptor_set, opts, opts.iters, query_pool);
 }
 
-fn recordRepeatedCommands(device: *Device, command_buffer: c.VkCommandBuffer, pipeline: c.VkPipeline, pipeline_layout: c.VkPipelineLayout, descriptor_set: c.VkDescriptorSet, opts: Options, repeat_count: usize, query_pool: c.VkQueryPool) !void {
-    var begin: c.VkCommandBufferBeginInfo = std.mem.zeroes(c.VkCommandBufferBeginInfo);
-    begin.sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    try vkCheck(device.fns.beginCommandBuffer(command_buffer, &begin));
+fn recordRepeatedCommands(device: *Device, command_buffer: zvk.CommandBuffer, pipeline: zvk.Pipeline, pipeline_layout: zvk.PipelineLayout, descriptor_set: zvk.DescriptorSet, opts: Options, repeat_count: usize, query_pool: zvk.QueryPool) !void {
+    var begin: zvk.CommandBufferBeginInfo = std.mem.zeroes(zvk.CommandBufferBeginInfo);
+    begin.s_type = .command_buffer_begin_info;
+    try vkCheck(device.fns.dispatch.vkBeginCommandBuffer.?(command_buffer, &begin));
 
-    if (query_pool != null) {
-        device.fns.cmdResetQueryPool(command_buffer, query_pool, 0, 2);
-        device.fns.cmdWriteTimestamp(command_buffer, c.VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, 0);
+    if (query_pool != .null_handle) {
+        device.fns.dispatch.vkCmdResetQueryPool.?(command_buffer, query_pool, 0, 2);
+        device.fns.dispatch.vkCmdWriteTimestamp.?(command_buffer, zvk.PipelineStageFlags{ .top_of_pipe_bit = true }, query_pool, 0);
     }
 
     const pc: PushConstants = .{
@@ -1255,94 +1054,94 @@ fn recordRepeatedCommands(device: *Device, command_buffer: c.VkCommandBuffer, pi
         .c_stride = @intCast(opts.n),
     };
 
-    device.fns.cmdBindPipeline(command_buffer, c.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    var sets = [_]c.VkDescriptorSet{descriptor_set};
-    device.fns.cmdBindDescriptorSets(command_buffer, c.VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout, 0, 1, sets[0..].ptr, 0, null);
-    device.fns.cmdPushConstants(command_buffer, pipeline_layout, c.VK_SHADER_STAGE_COMPUTE_BIT, 0, @sizeOf(PushConstants), &pc);
+    device.fns.dispatch.vkCmdBindPipeline.?(command_buffer, zvk.PipelineBindPoint.compute, pipeline);
+    var sets = [_]zvk.DescriptorSet{descriptor_set};
+    device.fns.dispatch.vkCmdBindDescriptorSets.?(command_buffer, zvk.PipelineBindPoint.compute, pipeline_layout, 0, 1, sets[0..].ptr, 0, null);
+    device.fns.dispatch.vkCmdPushConstants.?(command_buffer, pipeline_layout, zvk.ShaderStageFlags{ .compute_bit = true }, 0, @sizeOf(PushConstants), &pc);
     const dispatch_x: u32 = if (opts.shader.isCoop()) @intCast(opts.n / opts.shader.outputTileN()) else roundUpDiv(@intCast(opts.n), 16);
     const dispatch_y: u32 = if (opts.shader.isCoop()) @intCast(opts.m / opts.shader.outputTileM()) else roundUpDiv(@intCast(opts.m), 16);
-    for (0..repeat_count) |_| device.fns.cmdDispatch(command_buffer, dispatch_x, dispatch_y, 1);
+    for (0..repeat_count) |_| device.fns.dispatch.vkCmdDispatch.?(command_buffer, dispatch_x, dispatch_y, 1);
 
-    if (query_pool != null) {
-        device.fns.cmdWriteTimestamp(command_buffer, c.VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, query_pool, 1);
+    if (query_pool != .null_handle) {
+        device.fns.dispatch.vkCmdWriteTimestamp.?(command_buffer, zvk.PipelineStageFlags{ .bottom_of_pipe_bit = true }, query_pool, 1);
     }
 
-    try vkCheck(device.fns.endCommandBuffer(command_buffer));
+    try vkCheck(device.fns.dispatch.vkEndCommandBuffer.?(command_buffer));
 }
 
-fn recordUploadCommands(device: *Device, command_buffer: c.VkCommandBuffer, a_stage: Buffer, a_dev: Buffer, b_stage: Buffer, b_dev: Buffer) !void {
-    var begin: c.VkCommandBufferBeginInfo = std.mem.zeroes(c.VkCommandBufferBeginInfo);
-    begin.sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    try vkCheck(device.fns.beginCommandBuffer(command_buffer, &begin));
+fn recordUploadCommands(device: *Device, command_buffer: zvk.CommandBuffer, a_stage: Buffer, a_dev: Buffer, b_stage: Buffer, b_dev: Buffer) !void {
+    var begin: zvk.CommandBufferBeginInfo = std.mem.zeroes(zvk.CommandBufferBeginInfo);
+    begin.s_type = .command_buffer_begin_info;
+    try vkCheck(device.fns.dispatch.vkBeginCommandBuffer.?(command_buffer, &begin));
 
     copyBuffer(device, command_buffer, a_stage, a_dev);
     copyBuffer(device, command_buffer, b_stage, b_dev);
 
-    var barriers = [_]c.VkBufferMemoryBarrier{
-        bufferBarrier(a_dev, c.VK_ACCESS_TRANSFER_WRITE_BIT, c.VK_ACCESS_SHADER_READ_BIT),
-        bufferBarrier(b_dev, c.VK_ACCESS_TRANSFER_WRITE_BIT, c.VK_ACCESS_SHADER_READ_BIT),
+    var barriers = [_]zvk.BufferMemoryBarrier{
+        bufferBarrier(a_dev, zvk.AccessFlags{ .transfer_write_bit = true }, zvk.AccessFlags{ .shader_read_bit = true }),
+        bufferBarrier(b_dev, zvk.AccessFlags{ .transfer_write_bit = true }, zvk.AccessFlags{ .shader_read_bit = true }),
     };
-    device.fns.cmdPipelineBarrier(command_buffer, c.VK_PIPELINE_STAGE_TRANSFER_BIT, c.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, null, barriers.len, barriers[0..].ptr, 0, null);
+    device.fns.dispatch.vkCmdPipelineBarrier.?(command_buffer, zvk.PipelineStageFlags{ .transfer_bit = true }, zvk.PipelineStageFlags{ .compute_shader_bit = true }, .{}, 0, null, barriers.len, barriers[0..].ptr, 0, null);
 
-    try vkCheck(device.fns.endCommandBuffer(command_buffer));
+    try vkCheck(device.fns.dispatch.vkEndCommandBuffer.?(command_buffer));
 }
 
-fn recordDownloadCommands(device: *Device, command_buffer: c.VkCommandBuffer, out_dev: Buffer, out_stage: Buffer) !void {
-    var begin: c.VkCommandBufferBeginInfo = std.mem.zeroes(c.VkCommandBufferBeginInfo);
-    begin.sType = c.VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    try vkCheck(device.fns.beginCommandBuffer(command_buffer, &begin));
+fn recordDownloadCommands(device: *Device, command_buffer: zvk.CommandBuffer, out_dev: Buffer, out_stage: Buffer) !void {
+    var begin: zvk.CommandBufferBeginInfo = std.mem.zeroes(zvk.CommandBufferBeginInfo);
+    begin.s_type = .command_buffer_begin_info;
+    try vkCheck(device.fns.dispatch.vkBeginCommandBuffer.?(command_buffer, &begin));
 
-    var barriers = [_]c.VkBufferMemoryBarrier{
-        bufferBarrier(out_dev, c.VK_ACCESS_SHADER_WRITE_BIT, c.VK_ACCESS_TRANSFER_READ_BIT),
+    var barriers = [_]zvk.BufferMemoryBarrier{
+        bufferBarrier(out_dev, zvk.AccessFlags{ .shader_write_bit = true }, zvk.AccessFlags{ .transfer_read_bit = true }),
     };
-    device.fns.cmdPipelineBarrier(command_buffer, c.VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, c.VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, null, barriers.len, barriers[0..].ptr, 0, null);
+    device.fns.dispatch.vkCmdPipelineBarrier.?(command_buffer, zvk.PipelineStageFlags{ .compute_shader_bit = true }, zvk.PipelineStageFlags{ .transfer_bit = true }, .{}, 0, null, barriers.len, barriers[0..].ptr, 0, null);
     copyBuffer(device, command_buffer, out_dev, out_stage);
 
-    try vkCheck(device.fns.endCommandBuffer(command_buffer));
+    try vkCheck(device.fns.dispatch.vkEndCommandBuffer.?(command_buffer));
 }
 
-fn copyBuffer(device: *Device, command_buffer: c.VkCommandBuffer, src: Buffer, dst: Buffer) void {
-    var regions = [_]c.VkBufferCopy{
-        .{ .srcOffset = 0, .dstOffset = 0, .size = src.bytes() },
+fn copyBuffer(device: *Device, command_buffer: zvk.CommandBuffer, src: Buffer, dst: Buffer) void {
+    var regions = [_]zvk.BufferCopy{
+        .{ .src_offset = 0, .dst_offset = 0, .size = src.bytes() },
     };
-    device.fns.cmdCopyBuffer(command_buffer, src.handle, dst.handle, 1, regions[0..].ptr);
+    device.fns.dispatch.vkCmdCopyBuffer.?(command_buffer, src.handle, dst.handle, 1, regions[0..].ptr);
 }
 
-fn bufferBarrier(buffer: Buffer, src_access: c.VkAccessFlags, dst_access: c.VkAccessFlags) c.VkBufferMemoryBarrier {
+fn bufferBarrier(buffer: Buffer, src_access: zvk.AccessFlags, dst_access: zvk.AccessFlags) zvk.BufferMemoryBarrier {
     return .{
-        .sType = c.VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .pNext = null,
-        .srcAccessMask = src_access,
-        .dstAccessMask = dst_access,
-        .srcQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = c.VK_QUEUE_FAMILY_IGNORED,
+        .s_type = .buffer_memory_barrier,
+        .p_next = null,
+        .src_access_mask = src_access,
+        .dst_access_mask = dst_access,
+        .src_queue_family_index = zvk.QUEUE_FAMILY_IGNORED,
+        .dst_queue_family_index = zvk.QUEUE_FAMILY_IGNORED,
         .buffer = buffer.handle,
         .offset = 0,
         .size = buffer.bytes(),
     };
 }
 
-fn createFence(device: *Device) !c.VkFence {
-    var info: c.VkFenceCreateInfo = std.mem.zeroes(c.VkFenceCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+fn createFence(device: *Device) !zvk.Fence {
+    var info: zvk.FenceCreateInfo = std.mem.zeroes(zvk.FenceCreateInfo);
+    info.s_type = .fence_create_info;
 
-    var fence: c.VkFence = null;
-    try vkCheck(device.fns.createFence(device.handle, &info, null, &fence));
+    var fence: zvk.Fence = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreateFence.?(device.handle, &info, null, &fence));
     return fence;
 }
 
-fn createTimestampQueryPool(device: *Device) !c.VkQueryPool {
-    var info: c.VkQueryPoolCreateInfo = std.mem.zeroes(c.VkQueryPoolCreateInfo);
-    info.sType = c.VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-    info.queryType = c.VK_QUERY_TYPE_TIMESTAMP;
-    info.queryCount = 2;
+fn createTimestampQueryPool(device: *Device) !zvk.QueryPool {
+    var info: zvk.QueryPoolCreateInfo = std.mem.zeroes(zvk.QueryPoolCreateInfo);
+    info.s_type = .query_pool_create_info;
+    info.query_type = zvk.QueryType.timestamp;
+    info.query_count = 2;
 
-    var pool: c.VkQueryPool = null;
-    try vkCheck(device.fns.createQueryPool(device.handle, &info, null, &pool));
+    var pool: zvk.QueryPool = .null_handle;
+    try vkCheck(device.fns.dispatch.vkCreateQueryPool.?(device.handle, &info, null, &pool));
     return pool;
 }
 
-fn timeDispatches(vk: *Vulkan, device: *Device, command_buffer: c.VkCommandBuffer, timed_command_buffer: c.VkCommandBuffer, query_pool: c.VkQueryPool, fence: c.VkFence, opts: Options) !TimingResult {
+fn timeDispatches(vk: *Vulkan, device: *Device, command_buffer: zvk.CommandBuffer, timed_command_buffer: zvk.CommandBuffer, query_pool: zvk.QueryPool, fence: zvk.Fence, opts: Options) !TimingResult {
     if (opts.timing == .submit_cpu) {
         const avg_ns = try timeRepeatedDispatch(device, command_buffer, fence, opts.warmup, opts.iters);
         return .{ .avg_ns = avg_ns };
@@ -1356,7 +1155,7 @@ fn timeDispatches(vk: *Vulkan, device: *Device, command_buffer: c.VkCommandBuffe
     const end = try nanoTimestamp();
 
     var timestamps = [_]u64{ 0, 0 };
-    try vkCheck(device.fns.getQueryPoolResults(
+    try vkCheck(device.fns.dispatch.vkGetQueryPoolResults.?(
         device.handle,
         query_pool,
         0,
@@ -1364,7 +1163,7 @@ fn timeDispatches(vk: *Vulkan, device: *Device, command_buffer: c.VkCommandBuffe
         @sizeOf(@TypeOf(timestamps)),
         &timestamps,
         @sizeOf(u64),
-        c.VK_QUERY_RESULT_64_BIT | c.VK_QUERY_RESULT_WAIT_BIT,
+        zvk.QueryResultFlags{ .@"64_bit" = true, .wait_bit = true },
     ));
 
     const elapsed_ticks = timestamps[1] - timestamps[0];
@@ -1373,7 +1172,7 @@ fn timeDispatches(vk: *Vulkan, device: *Device, command_buffer: c.VkCommandBuffe
     return .{ .avg_ns = gpu_ns, .avg_gpu_ns = gpu_ns, .avg_batch_cpu_ns = batch_cpu_ns };
 }
 
-fn timeRepeatedDispatch(device: *Device, command_buffer: c.VkCommandBuffer, fence: c.VkFence, warmup: usize, iters: usize) !f64 {
+fn timeRepeatedDispatch(device: *Device, command_buffer: zvk.CommandBuffer, fence: zvk.Fence, warmup: usize, iters: usize) !f64 {
     for (0..warmup) |_| try submitCommand(device, command_buffer, fence);
 
     const start = try nanoTimestamp();
@@ -1386,13 +1185,13 @@ fn timeRepeatedDispatch(device: *Device, command_buffer: c.VkCommandBuffer, fenc
 
 fn requireTimestampQueue(vk: *Vulkan, device: *Device) !void {
     var count: u32 = 0;
-    vk.instance.getPhysicalDeviceQueueFamilyProperties(device.physical_device, &count, null);
+    vk.instance.dispatch.vkGetPhysicalDeviceQueueFamilyProperties.?(device.physical_device, &count, null);
     if (device.queue_family >= count) return error.TimestampUnsupported;
 
-    var stack_families: [64]c.VkQueueFamilyProperties = undefined;
+    var stack_families: [64]zvk.QueueFamilyProperties = undefined;
     if (count > stack_families.len) return error.TimestampUnsupported;
-    vk.instance.getPhysicalDeviceQueueFamilyProperties(device.physical_device, &count, stack_families[0..].ptr);
-    if (stack_families[device.queue_family].timestampValidBits == 0) {
+    vk.instance.dispatch.vkGetPhysicalDeviceQueueFamilyProperties.?(device.physical_device, &count, stack_families[0..].ptr);
+    if (stack_families[device.queue_family].timestamp_valid_bits == 0) {
         log.err("selected compute queue family does not support timestamps; use --timing=submit-cpu", .{});
         return error.TimestampUnsupported;
     }
@@ -1404,17 +1203,17 @@ fn nanoTimestamp() !i128 {
     return @as(i128, ts.tv_sec) * 1_000_000_000 + ts.tv_nsec;
 }
 
-fn submitCommand(device: *Device, command_buffer: c.VkCommandBuffer, fence: c.VkFence) !void {
-    var submit: c.VkSubmitInfo = std.mem.zeroes(c.VkSubmitInfo);
-    submit.sType = c.VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit.commandBufferCount = 1;
-    var command_buffers = [_]c.VkCommandBuffer{command_buffer};
-    submit.pCommandBuffers = command_buffers[0..].ptr;
-    var submits = [_]c.VkSubmitInfo{submit};
-    try vkCheck(device.fns.queueSubmit(device.queue, 1, submits[0..].ptr, fence));
-    var fences = [_]c.VkFence{fence};
-    try vkCheck(device.fns.waitForFences(device.handle, 1, fences[0..].ptr, c.VK_TRUE, std.math.maxInt(u64)));
-    try vkCheck(device.fns.resetFences(device.handle, 1, fences[0..].ptr));
+fn submitCommand(device: *Device, command_buffer: zvk.CommandBuffer, fence: zvk.Fence) !void {
+    var submit: zvk.SubmitInfo = std.mem.zeroes(zvk.SubmitInfo);
+    submit.s_type = .submit_info;
+    submit.command_buffer_count = 1;
+    var command_buffers = [_]zvk.CommandBuffer{command_buffer};
+    submit.p_command_buffers = command_buffers[0..].ptr;
+    var submits = [_]zvk.SubmitInfo{submit};
+    try vkCheck(device.fns.dispatch.vkQueueSubmit.?(device.queue, 1, submits[0..].ptr, fence));
+    var fences = [_]zvk.Fence{fence};
+    try vkCheck(device.fns.dispatch.vkWaitForFences.?(device.handle, 1, fences[0..].ptr, zvk.Bool32.true, std.math.maxInt(u64)));
+    try vkCheck(device.fns.dispatch.vkResetFences.?(device.handle, 1, fences[0..].ptr));
 }
 
 fn printResult(opts: Options, timing: TimingResult) void {
@@ -1570,36 +1369,42 @@ fn roundUpDiv(value: u32, divisor: u32) u32 {
     return (value + divisor - 1) / divisor;
 }
 
-fn deviceName(props: *const c.VkPhysicalDeviceProperties) []const u8 {
-    const name_ptr: [*:0]const u8 = @ptrCast(&props.bytes[20]);
-    return std.mem.span(name_ptr);
+fn deviceName(props: *const zvk.PhysicalDeviceProperties) []const u8 {
+    return std.mem.sliceTo(&props.device_name, 0);
 }
 
-fn apiVersion(props: *const c.VkPhysicalDeviceProperties) u32 {
-    return std.mem.readInt(u32, props.bytes[0..4], .little);
+fn api_version(props: *const zvk.PhysicalDeviceProperties) u32 {
+    return props.api_version;
 }
 
-fn vendorId(props: *const c.VkPhysicalDeviceProperties) u32 {
-    return std.mem.readInt(u32, props.bytes[8..12], .little);
+fn versionMajor(version: u32) u32 {
+    return @as(zvk.Version, @bitCast(version)).major;
 }
 
-fn deviceType(props: *const c.VkPhysicalDeviceProperties) u32 {
-    return std.mem.readInt(u32, props.bytes[16..20], .little);
+fn versionMinor(version: u32) u32 {
+    return @as(zvk.Version, @bitCast(version)).minor;
 }
 
-fn timestampPeriodNs(vk: *Vulkan, physical_device: c.VkPhysicalDevice) f32 {
-    var props: c.VkPhysicalDeviceProperties = undefined;
-    vk.instance.getPhysicalDeviceProperties(physical_device, &props);
-    const raw = std.mem.readInt(u32, props.bytes[720..724], .little);
-    return @bitCast(raw);
+fn versionPatch(version: u32) u32 {
+    return @as(zvk.Version, @bitCast(version)).patch;
 }
 
-fn vkCheck(result: c.VkResult) !void {
-    if (result == c.VK_SUCCESS) return;
-    log.err("Vulkan error: {d}", .{result});
+fn vendorId(props: *const zvk.PhysicalDeviceProperties) u32 {
+    return props.vendor_id;
+}
+
+fn deviceType(props: *const zvk.PhysicalDeviceProperties) zvk.PhysicalDeviceType {
+    return props.device_type;
+}
+
+fn timestampPeriodNs(vk: *Vulkan, physical_device: zvk.PhysicalDevice) f32 {
+    var props: zvk.PhysicalDeviceProperties = undefined;
+    vk.instance.dispatch.vkGetPhysicalDeviceProperties.?(physical_device, &props);
+    return props.limits.timestamp_period;
+}
+
+fn vkCheck(result: zvk.Result) !void {
+    if (result == zvk.Result.success) return;
+    log.err("Vulkan error: {d}", .{@intFromEnum(result)});
     return error.VulkanFailure;
-}
-
-fn tryLoadDeviceWaitIdle(gdp: VkGetDeviceProcAddr, device: c.VkDevice) !VkDeviceWaitIdle {
-    return loadDevice(VkDeviceWaitIdle, gdp, device, "vkDeviceWaitIdle");
 }

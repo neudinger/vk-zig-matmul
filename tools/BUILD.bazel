@@ -1,6 +1,20 @@
+load("@rules_zig//zig:defs.bzl", "zig_binary")
+
 exports_files([
     "embed_spv.zig",
     "emit_coop_spv.zig",
     "emit_nvcoop2_spv.zig",
     "patch_spv.zig",
 ])
+
+zig_binary(
+    name = "emit_zig_shader_spvasm",
+    main = "emit_zig_shader_spvasm.zig",
+    visibility = ["//visibility:public"],
+)
+
+zig_binary(
+    name = "validate_embed_spv",
+    main = "validate_embed_spv.zig",
+    visibility = ["//visibility:public"],
+)

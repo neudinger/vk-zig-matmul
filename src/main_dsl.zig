@@ -6,6 +6,7 @@ const matmul_coop_f16_spv = @import("matmul_coop_f16_spv");
 const matmul_coop_shared_f16_spv = @import("matmul_coop_shared_f16_spv");
 const matmul_nvcoop2_bf16_spv = @import("matmul_nvcoop2_bf16_spv");
 const matmul_nvcoop2_f16_spv = @import("matmul_nvcoop2_f16_spv");
+const matmul_nvcoop2_square_f16_frontend_spv = @import("matmul_nvcoop2_square_f16_frontend_spv");
 const matmul_nvcoop2_square_f16_spv = @import("matmul_nvcoop2_square_f16_spv");
 const matmul_nvcoop2_wide_f16_spv = @import("matmul_nvcoop2_wide_f16_spv");
 const matmul_zig_spv = @import("matmul_zig_dsl_spv");
@@ -31,6 +32,7 @@ const ShaderMode = enum {
     nvcoop2_f16,
     nvcoop2_wide_f16,
     nvcoop2_square_f16,
+    nvcoop2_square_f16_frontend,
 
     fn isCoop(self: ShaderMode) bool {
         return self != .zig;
@@ -38,7 +40,7 @@ const ShaderMode = enum {
 
     fn isNvCoop2(self: ShaderMode) bool {
         return switch (self) {
-            .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => true,
+            .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => true,
             .zig, .coop_bf16, .coop_f16, .coop_bf16_opt, .coop_f16_opt, .coop_shared_f16 => false,
         };
     }
@@ -55,19 +57,20 @@ const ShaderMode = enum {
             .nvcoop2_f16 => "nvcoop2-f16",
             .nvcoop2_wide_f16 => "nvcoop2-wide-f16",
             .nvcoop2_square_f16 => "nvcoop2-square-f16",
+            .nvcoop2_square_f16_frontend => "nvcoop2-square-f16-frontend",
         };
     }
 
     fn isBf16(self: ShaderMode) bool {
         return switch (self) {
             .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => true,
-            .zig, .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => false,
+            .zig, .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => false,
         };
     }
 
     fn isF16(self: ShaderMode) bool {
         return switch (self) {
-            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => true,
+            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => true,
             .zig, .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => false,
         };
     }
@@ -76,7 +79,7 @@ const ShaderMode = enum {
         return switch (self) {
             .zig => zvk.ComponentTypeKHR.float32_khr,
             .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => zvk.ComponentTypeKHR.bfloat16_khr,
-            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => zvk.ComponentTypeKHR.float16_khr,
+            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => zvk.ComponentTypeKHR.float16_khr,
         };
     }
 
@@ -85,7 +88,7 @@ const ShaderMode = enum {
             .zig => 16,
             .coop_bf16, .coop_bf16_opt => 16,
             .coop_f16, .coop_f16_opt, .coop_shared_f16 => 8,
-            .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => 64,
+            .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => 64,
         };
     }
 
@@ -94,7 +97,7 @@ const ShaderMode = enum {
             .zig, .coop_bf16, .coop_f16, .coop_bf16_opt, .coop_f16_opt => 16,
             .coop_shared_f16 => 64,
             .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16 => 64,
-            .nvcoop2_square_f16 => 128,
+            .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => 128,
         };
     }
 
@@ -106,7 +109,7 @@ const ShaderMode = enum {
             .coop_bf16_opt, .coop_f16_opt => 32,
             .coop_shared_f16 => 64,
             .nvcoop2_bf16, .nvcoop2_f16 => 64,
-            .nvcoop2_wide_f16, .nvcoop2_square_f16 => 128,
+            .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => 128,
         };
     }
 };
@@ -234,6 +237,8 @@ fn parseArgs(args: []const []const u8) !Options {
                 opts.shader = .nvcoop2_wide_f16;
             } else if (std.mem.eql(u8, value, "nvcoop2-square-f16")) {
                 opts.shader = .nvcoop2_square_f16;
+            } else if (std.mem.eql(u8, value, "nvcoop2-square-f16-frontend")) {
+                opts.shader = .nvcoop2_square_f16_frontend;
             } else {
                 log.err("unknown shader mode: {s}", .{value});
                 return error.InvalidShader;
@@ -886,6 +891,7 @@ fn createShaderModule(device: *Device, shader: ShaderMode) !zvk.ShaderModule {
         .nvcoop2_f16 => matmul_nvcoop2_f16_spv.words[0..],
         .nvcoop2_wide_f16 => matmul_nvcoop2_wide_f16_spv.words[0..],
         .nvcoop2_square_f16 => matmul_nvcoop2_square_f16_spv.words[0..],
+        .nvcoop2_square_f16_frontend => matmul_nvcoop2_square_f16_frontend_spv.words[0..],
     };
 
     var info: zvk.ShaderModuleCreateInfo = std.mem.zeroes(zvk.ShaderModuleCreateInfo);
@@ -1330,7 +1336,7 @@ fn inputBQuantized(row: usize, col: usize, shader: ShaderMode) f32 {
 
 fn encodeInput(value: f32, shader: ShaderMode) u16 {
     return switch (shader) {
-        .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => f32ToF16Bits(value),
+        .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => f32ToF16Bits(value),
         .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => f32ToBf16Bits(value),
         .zig => unreachable,
     };
@@ -1338,7 +1344,7 @@ fn encodeInput(value: f32, shader: ShaderMode) u16 {
 
 fn decodeInput(bits: u16, shader: ShaderMode) f32 {
     return switch (shader) {
-        .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => f16BitsToF32(bits),
+        .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16, .nvcoop2_square_f16_frontend => f16BitsToF32(bits),
         .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => bf16BitsToF32(bits),
         .zig => unreachable,
     };

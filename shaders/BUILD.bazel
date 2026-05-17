@@ -1,3 +1,4 @@
+load("//build_defs:shader_rules.bzl", "zig_shader_spv_words")
 load("@rules_zig//zig:defs.bzl", "zig_library")
 
 genrule(
@@ -443,6 +444,27 @@ zig_library(
     name = "matmul_nvcoop2_square_f16_dsl_text_spv_words",
     import_name = "matmul_nvcoop2_square_f16_spv",
     main = ":matmul_nvcoop2_square_f16_dsl_text_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+zig_shader_spv_words(
+    name = "matmul_nvcoop2_square_f16_frontend_spv",
+    src = "matmul_nvcoop2_square_f16_shader.zig",
+    import_name = "matmul_nvcoop2_square_f16_frontend_spv",
+    mode = "nvcoop2-f16-square",
+    target_env = "vulkan1.4",
+)
+
+filegroup(
+    name = "matmul_nvcoop2_square_f16_frontend_spvasm",
+    srcs = [":matmul_nvcoop2_square_f16_frontend_spv"],
+    output_group = "spvasm",
+)
+
+zig_library(
+    name = "matmul_nvcoop2_square_f16_frontend_spv_words",
+    import_name = "matmul_nvcoop2_square_f16_frontend_spv",
+    main = ":matmul_nvcoop2_square_f16_frontend_spv",
     visibility = ["//visibility:public"],
 )
 

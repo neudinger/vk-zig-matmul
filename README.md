@@ -37,6 +37,29 @@ the DSL-generated `nvcoop2-square-f16` shader matches the reference emitter's
 performance when run with the same device, dimensions, warmup, and iteration
 count.
 
+There is also a narrower Zig-shaped frontend prototype for the same NV coop2
+square-f16 shader. It reads
+`shaders/matmul_nvcoop2_square_f16_shader.zig`, a restricted source file that
+looks like a `callconv(.spirv_kernel)` shader, and lowers the supported syntax
+to SPIR-V assembly through custom Starlark actions instead of a shader
+`genrule`:
+
+```text
+shaders/matmul_nvcoop2_square_f16_shader.zig
+  -> tools/emit_zig_shader_spvasm
+  -> generated .spvasm text
+  -> Bazel-pinned spirv-as
+  -> .spv binary
+  -> tools/validate_embed_spv with Bazel-pinned spirv-val
+  -> embedded Zig words
+  -> Vulkan shader module
+```
+
+The frontend intentionally supports only the `nvcoop2-square-f16` matmul shape
+for now. It is selected separately with
+`--shader=nvcoop2-square-f16-frontend`, so the existing working
+`--shader=nvcoop2-square-f16` path remains available for comparison.
+
 Build:
 
 ```bash
@@ -64,6 +87,7 @@ bazel build //shaders:matmul_coop_bf16_spv_words //shaders:matmul_coop_f16_spv_w
 bazel build //shaders:matmul_nvcoop2_bf16_spv_words //shaders:matmul_nvcoop2_f16_spv_words
 bazel build //shaders:matmul_coop_shared_f16_spv_words //shaders:matmul_nvcoop2_square_f16_spv_words
 bazel build //shaders:matmul_nvcoop2_square_f16_dsl_text_spv_words
+bazel build //shaders:matmul_nvcoop2_square_f16_frontend_spv_words
 ```
 
 Run validation:
@@ -102,6 +126,32 @@ After building the DSL target, the generated assembly text is available at:
 bazel-bin/shaders/matmul_nvcoop2_square_f16_dsl_text.spvasm
 ```
 
+Build and run the Zig-shaped frontend prototype:
+
+```bash
+bazel build //tools:emit_zig_shader_spvasm
+bazel build //tools:validate_embed_spv
+bazel build //shaders:matmul_nvcoop2_square_f16_frontend_spv
+bazel build //shaders:matmul_nvcoop2_square_f16_frontend_spvasm
+bazel build //shaders:matmul_nvcoop2_square_f16_frontend_spv_words
+bazel run //:vk_matmul_dsl -- --device=0 --shader=nvcoop2-square-f16-frontend --m=128 --n=128 --k=16
+bazel run //:vk_matmul_dsl -- --device=0 --shader=nvcoop2-square-f16-frontend --m=1024 --n=1024 --k=1024 --iters=100 --warmup=20
+```
+
+The frontend assembly output group is exposed through:
+
+```bash
+bazel-bin/shaders/matmul_nvcoop2_square_f16_frontend_spv.spvasm
+```
+
+On the tested RTX 5090, the frontend prototype validated correctly and matched
+the existing DSL path within run-to-run noise:
+
+```text
+frontend: TFLOP/s=94.3707
+existing DSL: TFLOP/s=94.2712
+```
+
 Shader modes:
 
 - `--shader=zig`: scalar f32 path.
@@ -115,6 +165,7 @@ Shader modes:
 - `--shader=nvcoop2-wide-f16`: NVIDIA FP16 path with a 64x128 workgroup-scope tile.
 - `--shader=nvcoop2-square-f16`: NVIDIA FP16 path with a 128x128 workgroup-scope tile.
 - `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from the text-first Zig DSL pipeline.
+- `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16-frontend`: same runtime mode, but the shader module comes from the restricted Zig-shaped frontend pipeline.
 - `--timing=gpu` / `--timing=gpu-timestamp`: default GPU timestamp timing around a batched dispatch command buffer.
 - `--timing=submit-cpu`: legacy per-submit CPU wall-clock timing.
 - `--device=<index>`: select the Vulkan device index printed by `--list-devices`.

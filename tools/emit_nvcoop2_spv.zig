@@ -3,30 +3,61 @@ const std = @import("std");
 const Mode = enum {
     bf16,
     f16,
+    f16_wide,
+    f16_square,
 
     fn importName(self: Mode) []const u8 {
         return switch (self) {
             .bf16 => "matmul_nvcoop2_bf16_spv",
             .f16 => "matmul_nvcoop2_f16_spv",
+            .f16_wide => "matmul_nvcoop2_wide_f16_spv",
+            .f16_square => "matmul_nvcoop2_square_f16_spv",
         };
     }
 
     fn componentLabel(self: Mode) []const u8 {
         return switch (self) {
             .bf16 => "bf16",
-            .f16 => "f16",
+            .f16, .f16_wide, .f16_square => "f16",
         };
     }
 
     fn isF16(self: Mode) bool {
-        return self == .f16;
+        return switch (self) {
+            .f16, .f16_wide, .f16_square => true,
+            .bf16 => false,
+        };
+    }
+
+    fn tileM(self: Mode) u32 {
+        return switch (self) {
+            .bf16, .f16, .f16_wide => 64,
+            .f16_square => 128,
+        };
+    }
+
+    fn tileN(self: Mode) u32 {
+        return switch (self) {
+            .bf16, .f16 => 64,
+            .f16_wide, .f16_square => 128,
+        };
     }
 };
 
 fn modeFromArg(arg: []const u8) !Mode {
     if (std.mem.eql(u8, arg, "--mode=bf16")) return .bf16;
     if (std.mem.eql(u8, arg, "--mode=f16")) return .f16;
+    if (std.mem.eql(u8, arg, "--mode=f16-wide")) return .f16_wide;
+    if (std.mem.eql(u8, arg, "--mode=f16-square")) return .f16_square;
     return error.InvalidMode;
+}
+
+fn constForDim(ids: Ids, value: u32) u32 {
+    return switch (value) {
+        64 => ids.u32_64,
+        128 => ids.u32_128,
+        else => unreachable,
+    };
 }
 
 const OpName: u16 = 5;
@@ -153,6 +184,7 @@ const Ids = struct {
     u32_2: u32,
     u32_16: u32,
     u32_64: u32,
+    u32_128: u32,
     i32_0: u32,
     i32_1: u32,
     i32_2: u32,
@@ -262,6 +294,7 @@ const Builder = struct {
             .u32_2 = self.nextId(),
             .u32_16 = self.nextId(),
             .u32_64 = self.nextId(),
+            .u32_128 = self.nextId(),
             .i32_0 = self.nextId(),
             .i32_1 = self.nextId(),
             .i32_2 = self.nextId(),
@@ -316,7 +349,7 @@ fn emitModule(builder: *Builder, mode: Mode) ![]const u32 {
     try emitNames(builder, ids, mode);
     try emitDecorations(builder, ids);
     try emitTypes(builder, ids, mode);
-    try emitFunction(builder, ids);
+    try emitFunction(builder, ids, mode);
 
     builder.words[3] = builder.bound;
     return builder.words[0..builder.len];
@@ -435,6 +468,7 @@ fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_2, 2 });
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_16, 16 });
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_64, 64 });
+    try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_128, 128 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_0, 0 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_1, 1 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_2, 2 });
@@ -444,9 +478,11 @@ fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpConstant, &.{ ids.f32_ty, ids.f32_0, 0 });
     try builder.emit(OpConstant, &.{ ids.in_ty, ids.in_zero, 0 });
 
-    try builder.emit(OpTypeCooperativeMatrixKHR, &.{ ids.acc_ty, ids.f32_ty, ids.u32_2, ids.u32_64, ids.u32_64, ids.u32_2 });
-    try builder.emit(OpTypeCooperativeMatrixKHR, &.{ ids.a_ty, ids.in_ty, ids.u32_2, ids.u32_64, ids.u32_16, ids.u32_0 });
-    try builder.emit(OpTypeCooperativeMatrixKHR, &.{ ids.b_ty, ids.in_ty, ids.u32_2, ids.u32_16, ids.u32_64, ids.u32_1 });
+    const tile_m = constForDim(ids, mode.tileM());
+    const tile_n = constForDim(ids, mode.tileN());
+    try builder.emit(OpTypeCooperativeMatrixKHR, &.{ ids.acc_ty, ids.f32_ty, ids.u32_2, tile_m, tile_n, ids.u32_2 });
+    try builder.emit(OpTypeCooperativeMatrixKHR, &.{ ids.a_ty, ids.in_ty, ids.u32_2, tile_m, ids.u32_16, ids.u32_0 });
+    try builder.emit(OpTypeCooperativeMatrixKHR, &.{ ids.b_ty, ids.in_ty, ids.u32_2, ids.u32_16, tile_n, ids.u32_1 });
     try builder.emit(OpTypeTensorLayoutNV, &.{ ids.layout_ty, ids.u32_2, ids.u32_0 });
     try builder.emit(OpConstantComposite, &.{ ids.acc_ty, ids.acc_zero, ids.f32_0 });
     try builder.emit(OpConstantComposite, &.{ ids.a_ty, ids.a_zero, ids.in_zero });
@@ -480,7 +516,7 @@ fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpVariable, &.{ ids.ptr_pc_struct, ids.pc_var, StorageClassPushConstant });
 }
 
-fn emitFunction(builder: *Builder, ids: Ids) !void {
+fn emitFunction(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpFunction, &.{ ids.void_ty, ids.main, FunctionControlNone, ids.fn_void_ty });
     const entry_label = builder.nextId();
     try builder.emit(OpLabel, &.{entry_label});
@@ -491,8 +527,8 @@ fn emitFunction(builder: *Builder, ids: Ids) !void {
     const tile_col = try load(builder, ids.u32_ty, wg_x_ptr);
     const wg_y_ptr = try accessChain(builder, ids.ptr_input_u32, ids.wg, &.{ids.u32_1});
     const tile_row = try load(builder, ids.u32_ty, wg_y_ptr);
-    const row = try binary(builder, OpIMul, ids.u32_ty, tile_row, ids.u32_64);
-    const col = try binary(builder, OpIMul, ids.u32_ty, tile_col, ids.u32_64);
+    const row = try binary(builder, OpIMul, ids.u32_ty, tile_row, constForDim(ids, mode.tileM()));
+    const col = try binary(builder, OpIMul, ids.u32_ty, tile_col, constForDim(ids, mode.tileN()));
 
     const m_value = try loadPush(builder, ids, ids.i32_0);
     const n_value = try loadPush(builder, ids, ids.i32_1);
@@ -528,8 +564,8 @@ fn emitFunction(builder: *Builder, ids: Ids) !void {
 
     try builder.emit(OpLabel, &.{loop_body});
     const kk = try load(builder, ids.u32_ty, ids.kk_var);
-    const a_slice = try tensorSlice(builder, ids, a_layout, row, ids.u32_64, kk, ids.u32_16);
-    const b_slice = try tensorSlice(builder, ids, b_layout, kk, ids.u32_16, col, ids.u32_64);
+    const a_slice = try tensorSlice(builder, ids, a_layout, row, constForDim(ids, mode.tileM()), kk, ids.u32_16);
+    const b_slice = try tensorSlice(builder, ids, b_layout, kk, ids.u32_16, col, constForDim(ids, mode.tileN()));
     const a_mat = try coopTensorLoad(builder, ids.a_ty, a_base_ptr, ids.a_zero, a_slice);
     const b_mat = try coopTensorLoad(builder, ids.b_ty, b_base_ptr, ids.b_zero, b_slice);
     const acc_in = try load(builder, ids.acc_ty, ids.acc_var);
@@ -545,7 +581,7 @@ fn emitFunction(builder: *Builder, ids: Ids) !void {
     try builder.emit(OpBranch, &.{loop_header});
 
     try builder.emit(OpLabel, &.{loop_merge});
-    const c_slice = try tensorSlice(builder, ids, c_layout, row, ids.u32_64, col, ids.u32_64);
+    const c_slice = try tensorSlice(builder, ids, c_layout, row, constForDim(ids, mode.tileM()), col, constForDim(ids, mode.tileN()));
     const acc_final = try load(builder, ids.acc_ty, ids.acc_var);
     try coopTensorStore(builder, c_base_ptr, acc_final, c_slice);
     try builder.emit(OpReturn, &.{});

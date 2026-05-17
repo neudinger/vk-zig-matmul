@@ -5,6 +5,7 @@ const Mode = enum {
     f16,
     bf16_opt,
     f16_opt,
+    f16_wg,
 
     fn importName(self: Mode) []const u8 {
         return switch (self) {
@@ -12,20 +13,21 @@ const Mode = enum {
             .f16 => "matmul_coop_f16_spv",
             .bf16_opt => "matmul_coop_bf16_opt_spv",
             .f16_opt => "matmul_coop_f16_opt_spv",
+            .f16_wg => "matmul_coop_shared_f16_spv",
         };
     }
 
     fn componentLabel(self: Mode) []const u8 {
         return switch (self) {
             .bf16, .bf16_opt => "bf16",
-            .f16, .f16_opt => "f16",
+            .f16, .f16_opt, .f16_wg => "f16",
         };
     }
 
     fn tileN(self: Mode) u32 {
         return switch (self) {
             .bf16, .bf16_opt => 16,
-            .f16, .f16_opt => 8,
+            .f16, .f16_opt, .f16_wg => 8,
         };
     }
 
@@ -33,23 +35,34 @@ const Mode = enum {
         return switch (self) {
             .bf16, .f16 => 1,
             .bf16_opt => 2,
-            .f16_opt => 4,
+            .f16_opt, .f16_wg => 4,
         };
     }
 
     fn outputTileN(self: Mode) u32 {
-        return self.tileN() * self.nTiles();
+        return switch (self) {
+            .f16_wg => 64,
+            else => self.tileN() * self.nTiles(),
+        };
     }
 
     fn isF16(self: Mode) bool {
         return switch (self) {
-            .f16, .f16_opt => true,
+            .f16, .f16_opt, .f16_wg => true,
             .bf16, .bf16_opt => false,
         };
     }
 
     fn hasOptimizedNTiling(self: Mode) bool {
         return self.nTiles() > 1;
+    }
+
+    fn isWorkgroupTiled(self: Mode) bool {
+        return self == .f16_wg;
+    }
+
+    fn localSizeX(self: Mode) u32 {
+        return if (self.isWorkgroupTiled()) 256 else 32;
     }
 };
 
@@ -60,6 +73,7 @@ fn modeFromArg(arg: []const u8) !Mode {
     if (std.mem.eql(u8, arg, "--mode=f16")) return .f16;
     if (std.mem.eql(u8, arg, "--mode=bf16-opt")) return .bf16_opt;
     if (std.mem.eql(u8, arg, "--mode=f16-opt")) return .f16_opt;
+    if (std.mem.eql(u8, arg, "--mode=f16-wg")) return .f16_wg;
     return error.InvalidMode;
 }
 
@@ -73,6 +87,7 @@ fn constForU32(ids: Ids, value: u32) u32 {
         16 => ids.u32_16,
         24 => ids.u32_24,
         32 => ids.u32_32,
+        64 => ids.u32_64,
         else => unreachable,
     };
 }
@@ -114,6 +129,8 @@ const OpDecorate: u16 = 71;
 const OpMemberDecorate: u16 = 72;
 const OpIAdd: u16 = 128;
 const OpIMul: u16 = 132;
+const OpUDiv: u16 = 134;
+const OpUMod: u16 = 137;
 const OpULessThan: u16 = 176;
 const OpLoopMerge: u16 = 246;
 const OpLabel: u16 = 248;
@@ -184,6 +201,7 @@ pub fn main(init: std.process.Init) !void {
 const Ids = struct {
     main: u32,
     wg: u32,
+    lid: u32,
     a_var: u32,
     b_var: u32,
     c_var: u32,
@@ -206,6 +224,7 @@ const Ids = struct {
     u32_16: u32,
     u32_24: u32,
     u32_32: u32,
+    u32_64: u32,
     i32_0: u32,
     i32_2: u32,
     i32_3: u32,
@@ -291,6 +310,7 @@ const Builder = struct {
         return .{
             .main = self.nextId(),
             .wg = self.nextId(),
+            .lid = self.nextId(),
             .a_var = self.nextId(),
             .b_var = self.nextId(),
             .c_var = self.nextId(),
@@ -313,6 +333,7 @@ const Builder = struct {
             .u32_16 = self.nextId(),
             .u32_24 = self.nextId(),
             .u32_32 = self.nextId(),
+            .u32_64 = self.nextId(),
             .i32_0 = self.nextId(),
             .i32_2 = self.nextId(),
             .i32_3 = self.nextId(),
@@ -358,7 +379,7 @@ fn emitModule(builder: *Builder, mode: Mode) ![]const u32 {
 
     try emitHeader(builder);
     try emitCapabilities(builder, mode);
-    try emitEntry(builder, ids);
+    try emitEntry(builder, ids, mode);
     try emitNames(builder, ids, mode);
     try emitDecorations(builder, ids);
     try emitTypes(builder, ids, mode);
@@ -394,20 +415,22 @@ fn emitCapabilities(builder: *Builder, mode: Mode) !void {
     try builder.emit(OpMemoryModel, &.{ AddressingModelLogical, MemoryModelVulkan });
 }
 
-fn emitEntry(builder: *Builder, ids: Ids) !void {
+fn emitEntry(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emitString(OpEntryPoint, &.{ ExecutionModelGLCompute, ids.main }, "main", &.{
         ids.wg,
+        ids.lid,
         ids.a_var,
         ids.b_var,
         ids.c_var,
         ids.pc_var,
     });
-    try builder.emit(OpExecutionMode, &.{ ids.main, ExecutionModeLocalSize, 32, 1, 1 });
+    try builder.emit(OpExecutionMode, &.{ ids.main, ExecutionModeLocalSize, mode.localSizeX(), 1, 1 });
 }
 
 fn emitNames(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emitString(OpName, &.{ids.main}, "main", &.{});
     try builder.emitString(OpName, &.{ids.wg}, "gl_WorkGroupID", &.{});
+    try builder.emitString(OpName, &.{ids.lid}, "gl_LocalInvocationID", &.{});
     try builder.emitString(OpName, &.{ids.a_var}, "a_buffer", &.{});
     try builder.emitString(OpName, &.{ids.b_var}, "b_buffer", &.{});
     try builder.emitString(OpName, &.{ids.c_var}, "c_buffer", &.{});
@@ -425,6 +448,7 @@ fn emitNames(builder: *Builder, ids: Ids, mode: Mode) !void {
 
 fn emitDecorations(builder: *Builder, ids: Ids) !void {
     try builder.emit(OpDecorate, &.{ ids.wg, DecorationBuiltIn, BuiltInWorkgroupId });
+    try builder.emit(OpDecorate, &.{ ids.lid, DecorationBuiltIn, 27 });
 
     try builder.emit(OpDecorate, &.{ ids.array_a, DecorationArrayStride, 2 });
     try builder.emit(OpDecorate, &.{ ids.array_b, DecorationArrayStride, 2 });
@@ -481,6 +505,7 @@ fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_16, 16 });
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_24, 24 });
     try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_32, 32 });
+    try builder.emit(OpConstant, &.{ ids.u32_ty, ids.u32_64, 64 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_0, 0 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_2, 2 });
     try builder.emit(OpConstant, &.{ ids.i32_ty, ids.i32_3, 3 });
@@ -515,6 +540,7 @@ fn emitTypes(builder: *Builder, ids: Ids, mode: Mode) !void {
     try builder.emit(OpTypePointer, &.{ ids.ptr_pc_u32, StorageClassPushConstant, ids.u32_ty });
 
     try builder.emit(OpVariable, &.{ ids.ptr_input_vec3_u32, ids.wg, StorageClassInput });
+    try builder.emit(OpVariable, &.{ ids.ptr_input_vec3_u32, ids.lid, StorageClassInput });
     try builder.emit(OpVariable, &.{ ids.ptr_sb_struct_a, ids.a_var, StorageClassStorageBuffer });
     try builder.emit(OpVariable, &.{ ids.ptr_sb_struct_b, ids.b_var, StorageClassStorageBuffer });
     try builder.emit(OpVariable, &.{ ids.ptr_sb_struct_c, ids.c_var, StorageClassStorageBuffer });
@@ -539,8 +565,26 @@ fn emitFunction(builder: *Builder, ids: Ids, mode: Mode) !void {
     const tile_col = try load(builder, ids.u32_ty, wg_x_ptr);
     const wg_y_ptr = try accessChain(builder, ids.ptr_input_u32, ids.wg, &.{ids.u32_1});
     const tile_row = try load(builder, ids.u32_ty, wg_y_ptr);
-    const row = try binary(builder, OpIMul, ids.u32_ty, tile_row, ids.u32_16);
-    const col = try binary(builder, OpIMul, ids.u32_ty, tile_col, output_tile_n_id);
+    const tile_origin = if (mode.isWorkgroupTiled()) blk: {
+        const lid_x_ptr = try accessChain(builder, ids.ptr_input_u32, ids.lid, &.{ids.u32_0});
+        const lid_x = try load(builder, ids.u32_ty, lid_x_ptr);
+        const subgroup_id = try binary(builder, OpUDiv, ids.u32_ty, lid_x, ids.u32_32);
+        const row_group = try binary(builder, OpUDiv, ids.u32_ty, subgroup_id, ids.u32_2);
+        const col_group = try binary(builder, OpUMod, ids.u32_ty, subgroup_id, ids.u32_2);
+        const row_base = try binary(builder, OpIMul, ids.u32_ty, tile_row, ids.u32_64);
+        const col_base = try binary(builder, OpIMul, ids.u32_ty, tile_col, output_tile_n_id);
+        const row_delta = try binary(builder, OpIMul, ids.u32_ty, row_group, ids.u32_16);
+        const col_delta = try binary(builder, OpIMul, ids.u32_ty, col_group, ids.u32_32);
+        const tiled_row = try binary(builder, OpIAdd, ids.u32_ty, row_base, row_delta);
+        const tiled_col = try binary(builder, OpIAdd, ids.u32_ty, col_base, col_delta);
+        break :blk .{ tiled_row, tiled_col };
+    } else blk: {
+        const scalar_row = try binary(builder, OpIMul, ids.u32_ty, tile_row, ids.u32_16);
+        const scalar_col = try binary(builder, OpIMul, ids.u32_ty, tile_col, output_tile_n_id);
+        break :blk .{ scalar_row, scalar_col };
+    };
+    const row = tile_origin[0];
+    const col = tile_origin[1];
 
     var zero_tile_i: usize = 0;
     while (zero_tile_i < n_tiles) : (zero_tile_i += 1) {

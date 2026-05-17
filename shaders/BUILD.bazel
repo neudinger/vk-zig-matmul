@@ -107,6 +107,32 @@ zig_library(
 )
 
 genrule(
+    name = "matmul_coop_shared_f16_spv_gen",
+    srcs = ["//tools:emit_coop_spv.zig"],
+    outs = [
+        "matmul_coop_shared_f16.spv",
+        "matmul_coop_shared_f16_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:emit_coop_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- --mode=f16-wg "$(@D)/matmul_coop_shared_f16.spv" "$(@D)/matmul_coop_shared_f16_spv.zig"
+spirv-val --target-env vulkan1.3 "$(@D)/matmul_coop_shared_f16.spv"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_coop_shared_f16_spv_words",
+    import_name = "matmul_coop_shared_f16_spv",
+    main = ":matmul_coop_shared_f16_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
     name = "matmul_coop_bf16_spv_gen",
     srcs = ["//tools:emit_coop_spv.zig"],
     outs = [
@@ -189,6 +215,58 @@ zig_library(
     name = "matmul_nvcoop2_f16_spv_words",
     import_name = "matmul_nvcoop2_f16_spv",
     main = ":matmul_nvcoop2_f16_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_nvcoop2_wide_f16_spv_gen",
+    srcs = ["//tools:emit_nvcoop2_spv.zig"],
+    outs = [
+        "matmul_nvcoop2_wide_f16.spv",
+        "matmul_nvcoop2_wide_f16_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- --mode=f16-wide "$(@D)/matmul_nvcoop2_wide_f16.spv" "$(@D)/matmul_nvcoop2_wide_f16_spv.zig"
+spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_wide_f16.spv"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_wide_f16_spv_words",
+    import_name = "matmul_nvcoop2_wide_f16_spv",
+    main = ":matmul_nvcoop2_wide_f16_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_nvcoop2_square_f16_spv_gen",
+    srcs = ["//tools:emit_nvcoop2_spv.zig"],
+    outs = [
+        "matmul_nvcoop2_square_f16.spv",
+        "matmul_nvcoop2_square_f16_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:emit_nvcoop2_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- --mode=f16-square "$(@D)/matmul_nvcoop2_square_f16.spv" "$(@D)/matmul_nvcoop2_square_f16_spv.zig"
+spirv-val --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_square_f16.spv"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_square_f16_spv_words",
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    main = ":matmul_nvcoop2_square_f16_spv.zig",
     visibility = ["//visibility:public"],
 )
 

@@ -3,8 +3,11 @@ const matmul_coop_bf16_opt_spv = @import("matmul_coop_bf16_opt_spv");
 const matmul_coop_bf16_spv = @import("matmul_coop_bf16_spv");
 const matmul_coop_f16_opt_spv = @import("matmul_coop_f16_opt_spv");
 const matmul_coop_f16_spv = @import("matmul_coop_f16_spv");
+const matmul_coop_shared_f16_spv = @import("matmul_coop_shared_f16_spv");
 const matmul_nvcoop2_bf16_spv = @import("matmul_nvcoop2_bf16_spv");
 const matmul_nvcoop2_f16_spv = @import("matmul_nvcoop2_f16_spv");
+const matmul_nvcoop2_square_f16_spv = @import("matmul_nvcoop2_square_f16_spv");
+const matmul_nvcoop2_wide_f16_spv = @import("matmul_nvcoop2_wide_f16_spv");
 const matmul_zig_spv = @import("matmul_zig_spv");
 const c = @import("vulkan_loader.zig").c;
 
@@ -145,8 +148,11 @@ const ShaderMode = enum {
     coop_f16,
     coop_bf16_opt,
     coop_f16_opt,
+    coop_shared_f16,
     nvcoop2_bf16,
     nvcoop2_f16,
+    nvcoop2_wide_f16,
+    nvcoop2_square_f16,
 
     fn isCoop(self: ShaderMode) bool {
         return self != .zig;
@@ -154,8 +160,8 @@ const ShaderMode = enum {
 
     fn isNvCoop2(self: ShaderMode) bool {
         return switch (self) {
-            .nvcoop2_bf16, .nvcoop2_f16 => true,
-            .zig, .coop_bf16, .coop_f16, .coop_bf16_opt, .coop_f16_opt => false,
+            .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => true,
+            .zig, .coop_bf16, .coop_f16, .coop_bf16_opt, .coop_f16_opt, .coop_shared_f16 => false,
         };
     }
 
@@ -166,21 +172,24 @@ const ShaderMode = enum {
             .coop_f16 => "coop-f16",
             .coop_bf16_opt => "coop-opt",
             .coop_f16_opt => "coop-f16-opt",
+            .coop_shared_f16 => "coop-shared-f16",
             .nvcoop2_bf16 => "nvcoop2",
             .nvcoop2_f16 => "nvcoop2-f16",
+            .nvcoop2_wide_f16 => "nvcoop2-wide-f16",
+            .nvcoop2_square_f16 => "nvcoop2-square-f16",
         };
     }
 
     fn isBf16(self: ShaderMode) bool {
         return switch (self) {
             .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => true,
-            .zig, .coop_f16, .coop_f16_opt, .nvcoop2_f16 => false,
+            .zig, .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => false,
         };
     }
 
     fn isF16(self: ShaderMode) bool {
         return switch (self) {
-            .coop_f16, .coop_f16_opt, .nvcoop2_f16 => true,
+            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => true,
             .zig, .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => false,
         };
     }
@@ -189,7 +198,7 @@ const ShaderMode = enum {
         return switch (self) {
             .zig => c.VK_COMPONENT_TYPE_FLOAT32_KHR,
             .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => c.VK_COMPONENT_TYPE_BFLOAT16_KHR,
-            .coop_f16, .coop_f16_opt, .nvcoop2_f16 => c.VK_COMPONENT_TYPE_FLOAT16_KHR,
+            .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => c.VK_COMPONENT_TYPE_FLOAT16_KHR,
         };
     }
 
@@ -197,15 +206,17 @@ const ShaderMode = enum {
         return switch (self) {
             .zig => 16,
             .coop_bf16, .coop_bf16_opt => 16,
-            .coop_f16, .coop_f16_opt => 8,
-            .nvcoop2_bf16, .nvcoop2_f16 => 64,
+            .coop_f16, .coop_f16_opt, .coop_shared_f16 => 8,
+            .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => 64,
         };
     }
 
     fn outputTileM(self: ShaderMode) usize {
         return switch (self) {
             .zig, .coop_bf16, .coop_f16, .coop_bf16_opt, .coop_f16_opt => 16,
-            .nvcoop2_bf16, .nvcoop2_f16 => 64,
+            .coop_shared_f16 => 64,
+            .nvcoop2_bf16, .nvcoop2_f16, .nvcoop2_wide_f16 => 64,
+            .nvcoop2_square_f16 => 128,
         };
     }
 
@@ -215,7 +226,9 @@ const ShaderMode = enum {
             .coop_bf16 => 16,
             .coop_f16 => 8,
             .coop_bf16_opt, .coop_f16_opt => 32,
+            .coop_shared_f16 => 64,
             .nvcoop2_bf16, .nvcoop2_f16 => 64,
+            .nvcoop2_wide_f16, .nvcoop2_square_f16 => 128,
         };
     }
 };
@@ -333,10 +346,16 @@ fn parseArgs(args: []const []const u8) !Options {
                 opts.shader = .coop_bf16_opt;
             } else if (std.mem.eql(u8, value, "coop-f16-opt")) {
                 opts.shader = .coop_f16_opt;
+            } else if (std.mem.eql(u8, value, "coop-shared-f16")) {
+                opts.shader = .coop_shared_f16;
             } else if (std.mem.eql(u8, value, "nvcoop2") or std.mem.eql(u8, value, "nvcoop2-bf16")) {
                 opts.shader = .nvcoop2_bf16;
             } else if (std.mem.eql(u8, value, "nvcoop2-f16")) {
                 opts.shader = .nvcoop2_f16;
+            } else if (std.mem.eql(u8, value, "nvcoop2-wide-f16")) {
+                opts.shader = .nvcoop2_wide_f16;
+            } else if (std.mem.eql(u8, value, "nvcoop2-square-f16")) {
+                opts.shader = .nvcoop2_square_f16;
             } else {
                 log.err("unknown shader mode: {s}", .{value});
                 return error.InvalidShader;
@@ -524,8 +543,8 @@ fn findComputeQueueFamily(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
 
 fn validateCoopDimensions(opts: Options) void {
     if (opts.shader.isNvCoop2()) {
-        if (opts.m % 64 == 0 and opts.n % 64 == 0 and opts.k % 16 == 0) return;
-        log.err("--shader={s} requires m % 64 == 0, n % 64 == 0, and k % 16 == 0; use --shader=zig or KHR coop modes for other dimensions", .{opts.shader.name()});
+        if (opts.m % opts.shader.outputTileM() == 0 and opts.n % opts.shader.outputTileN() == 0 and opts.k % 16 == 0) return;
+        log.err("--shader={s} requires m % {d} == 0, n % {d} == 0, and k % 16 == 0; use --shader=zig or KHR coop modes for other dimensions", .{ opts.shader.name(), opts.shader.outputTileM(), opts.shader.outputTileN() });
         std.process.exit(2);
     }
 
@@ -660,9 +679,11 @@ fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
     properties2.sType = c.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     properties2.pNext = &nv2_props;
     vk.instance.getPhysicalDeviceProperties2(physical_device, &properties2);
-    if (nv2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize < 256 or nv2_props.cooperativeMatrixFlexibleDimensionsMaxDimension < 64) {
-        log.err("{s} requires NV coop2 maxWorkgroupSize >= 256 and maxDimension >= 64; got maxWorkgroupSize={d} maxDimension={d}", .{
+    const required_max_dim = @max(shader.outputTileM(), shader.outputTileN());
+    if (nv2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize < 256 or nv2_props.cooperativeMatrixFlexibleDimensionsMaxDimension < required_max_dim) {
+        log.err("{s} requires NV coop2 maxWorkgroupSize >= 256 and maxDimension >= {d}; got maxWorkgroupSize={d} maxDimension={d}", .{
             shader.name(),
+            required_max_dim,
             nv2_props.cooperativeMatrixWorkgroupScopeMaxWorkgroupSize,
             nv2_props.cooperativeMatrixFlexibleDimensionsMaxDimension,
         });
@@ -690,8 +711,10 @@ fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
     try vkCheck(get_props(physical_device, &count, props.ptr));
 
     const input_type = shader.inputComponentType();
+    const tile_m: u32 = @intCast(shader.outputTileM());
+    const tile_n: u32 = @intCast(shader.outputTileN());
     for (props[0..count]) |prop| {
-        if (64 % prop.MGranularity == 0 and 64 % prop.NGranularity == 0 and 16 % prop.KGranularity == 0 and
+        if (tile_m % prop.MGranularity == 0 and tile_n % prop.NGranularity == 0 and 16 % prop.KGranularity == 0 and
             prop.AType == input_type and prop.BType == input_type and
             prop.CType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
             prop.ResultType == c.VK_COMPONENT_TYPE_FLOAT32_KHR and
@@ -703,7 +726,7 @@ fn requireNvCoop2Property(vk: *Vulkan, allocator: std.mem.Allocator, physical_de
         }
     }
 
-    log.err("selected device lacks required {s} NV coop2 property: tile=64x64x16 A/B={d} C/Result=FLOAT32 scope=WORKGROUP invocations=256", .{ shader.name(), input_type });
+    log.err("selected device lacks required {s} NV coop2 property: tile={d}x{d}x16 A/B={d} C/Result=FLOAT32 scope=WORKGROUP invocations=256", .{ shader.name(), tile_m, tile_n, input_type });
     for (props[0..@min(count, 32)]) |prop| {
         log.err("  property: Mgran={d} Ngran={d} Kgran={d} A={d} B={d} C={d} Result={d} sat={d} scope={d} invocations={d}", .{
             prop.MGranularity,
@@ -1059,8 +1082,11 @@ fn createShaderModule(device: *Device, shader: ShaderMode) !c.VkShaderModule {
         .coop_f16 => matmul_coop_f16_spv.words[0..],
         .coop_bf16_opt => matmul_coop_bf16_opt_spv.words[0..],
         .coop_f16_opt => matmul_coop_f16_opt_spv.words[0..],
+        .coop_shared_f16 => matmul_coop_shared_f16_spv.words[0..],
         .nvcoop2_bf16 => matmul_nvcoop2_bf16_spv.words[0..],
         .nvcoop2_f16 => matmul_nvcoop2_f16_spv.words[0..],
+        .nvcoop2_wide_f16 => matmul_nvcoop2_wide_f16_spv.words[0..],
+        .nvcoop2_square_f16 => matmul_nvcoop2_square_f16_spv.words[0..],
     };
 
     var info: c.VkShaderModuleCreateInfo = std.mem.zeroes(c.VkShaderModuleCreateInfo);
@@ -1505,7 +1531,7 @@ fn inputBQuantized(row: usize, col: usize, shader: ShaderMode) f32 {
 
 fn encodeInput(value: f32, shader: ShaderMode) u16 {
     return switch (shader) {
-        .coop_f16, .coop_f16_opt, .nvcoop2_f16 => f32ToF16Bits(value),
+        .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => f32ToF16Bits(value),
         .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => f32ToBf16Bits(value),
         .zig => unreachable,
     };
@@ -1513,7 +1539,7 @@ fn encodeInput(value: f32, shader: ShaderMode) u16 {
 
 fn decodeInput(bits: u16, shader: ShaderMode) f32 {
     return switch (shader) {
-        .coop_f16, .coop_f16_opt, .nvcoop2_f16 => f16BitsToF32(bits),
+        .coop_f16, .coop_f16_opt, .coop_shared_f16, .nvcoop2_f16, .nvcoop2_wide_f16, .nvcoop2_square_f16 => f16BitsToF32(bits),
         .coop_bf16, .coop_bf16_opt, .nvcoop2_bf16 => bf16BitsToF32(bits),
         .zig => unreachable,
     };

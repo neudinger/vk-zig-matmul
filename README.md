@@ -39,6 +39,7 @@ Build the Zig SPIR-V shader target:
 bazel build //shaders:matmul_zig_spv
 bazel build //shaders:matmul_coop_bf16_spv_words //shaders:matmul_coop_f16_spv_words
 bazel build //shaders:matmul_nvcoop2_bf16_spv_words //shaders:matmul_nvcoop2_f16_spv_words
+bazel build //shaders:matmul_coop_shared_f16_spv_words //shaders:matmul_nvcoop2_square_f16_spv_words
 ```
 
 Run validation:
@@ -51,6 +52,8 @@ bazel run //:vk_matmul -- --shader=coop --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --shader=coop-opt --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --device=0 --shader=nvcoop2-f16 --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --device=0 --shader=nvcoop2 --m=64 --n=64 --k=64
+bazel run //:vk_matmul -- --device=0 --shader=coop-shared-f16 --m=64 --n=64 --k=64
+bazel run //:vk_matmul -- --device=0 --shader=nvcoop2-square-f16 --m=1024 --n=1024 --k=1024
 bazel run //:vk_matmul -- --shader=coop --m=1024 --n=1024 --k=1024
 bazel run //:vk_matmul -- --shader=coop-opt --m=1024 --n=1024 --k=1024
 bazel run //:vk_matmul -- --device=0 --shader=nvcoop2 --m=1024 --n=1024 --k=1024
@@ -63,8 +66,11 @@ Shader modes:
 - `--shader=coop-f16`: FP16 inputs with f32 accumulation and output.
 - `--shader=coop-opt` / `--shader=coop-bf16-opt`: BF16 optimized path, computing a 16x32 output tile per workgroup by reusing one A cooperative-matrix load across two N tiles.
 - `--shader=coop-f16-opt`: FP16 optimized path, computing a 16x32 output tile per workgroup by reusing one A cooperative-matrix load across four N tiles.
+- `--shader=coop-shared-f16`: FP16 KHR subgroup cooperative-matrix path using a 256-thread workgroup split into 8 subgroups; each workgroup computes one 64x64 output tile.
 - `--shader=nvcoop2` / `--shader=nvcoop2-bf16`: NVIDIA `VK_NV_cooperative_matrix2` BF16 path with a 64x64 workgroup-scope tile.
 - `--shader=nvcoop2-f16`: NVIDIA `VK_NV_cooperative_matrix2` FP16 path with a 64x64 workgroup-scope tile.
+- `--shader=nvcoop2-wide-f16`: NVIDIA FP16 path with a 64x128 workgroup-scope tile.
+- `--shader=nvcoop2-square-f16`: NVIDIA FP16 path with a 128x128 workgroup-scope tile.
 - `--timing=gpu` / `--timing=gpu-timestamp`: default GPU timestamp timing around a batched dispatch command buffer.
 - `--timing=submit-cpu`: legacy per-submit CPU wall-clock timing.
 - `--device=<index>`: select the Vulkan device index printed by `--list-devices`.
@@ -77,7 +83,8 @@ The BF16 target uses the KHR BF16 tile reported by the tested NVIDIA driver,
 The `nvcoop2*` modes additionally require an NVIDIA device advertising
 `VK_NV_cooperative_matrix2`, workgroup-scope cooperative matrices, flexible
 dimensions, tensor addressing, and block loads. They require `m % 64 == 0`,
-`n % 64 == 0`, and `k % 16 == 0`.
+`n % 64 == 0`, and `k % 16 == 0` for the 64x64 mode; wider modes require
+their tile dimensions.
 
 The current shader source avoids three Zig SPIR-V backend limitations:
 

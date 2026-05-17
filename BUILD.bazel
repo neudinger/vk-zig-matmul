@@ -11,8 +11,11 @@ zig_binary(
         "//shaders:matmul_coop_bf16_spv_words",
         "//shaders:matmul_coop_f16_opt_spv_words",
         "//shaders:matmul_coop_f16_spv_words",
+        "//shaders:matmul_coop_shared_f16_spv_words",
         "//shaders:matmul_nvcoop2_bf16_spv_words",
         "//shaders:matmul_nvcoop2_f16_spv_words",
+        "//shaders:matmul_nvcoop2_square_f16_spv_words",
+        "//shaders:matmul_nvcoop2_wide_f16_spv_words",
         "//shaders:matmul_zig_spv_words",
     ],
     zigopts = [

@@ -15,6 +15,28 @@ validation uses Bazel-pinned SPIRV-Tools rather than a host `spirv-val` from
 `libvulkan.so.1`, so GPU execution depends on the host Vulkan loader, driver,
 and device.
 
+The experimental `//:vk_matmul_dsl` binary keeps the reference binary clean
+while testing shader-shaped Zig DSL sources. Its NV coop2 square-f16 path is
+text-first:
+
+```text
+shaders/matmul_nvcoop2_square_f16_kernel.zig
+  -> generated .spvasm text
+  -> Bazel-pinned spirv-as
+  -> .spv binary
+  -> Bazel-pinned spirv-val
+  -> embedded Zig words
+  -> Vulkan shader module
+```
+
+That path uses `shaders/nvcoop2_dsl.zig` to emit symbolic SPIR-V assembly for
+`VK_NV_cooperative_matrix2`, `SPV_NV_tensor_addressing`, and
+`SPV_KHR_cooperative_matrix`. The generated `.spvasm`, `.spv`, and embedded
+word module are Bazel outputs, not checked-in sources. On the tested RTX 5090,
+the DSL-generated `nvcoop2-square-f16` shader matches the reference emitter's
+performance when run with the same device, dimensions, warmup, and iteration
+count.
+
 Build:
 
 ```bash
@@ -41,6 +63,7 @@ bazel build //shaders:matmul_zig_spv
 bazel build //shaders:matmul_coop_bf16_spv_words //shaders:matmul_coop_f16_spv_words
 bazel build //shaders:matmul_nvcoop2_bf16_spv_words //shaders:matmul_nvcoop2_f16_spv_words
 bazel build //shaders:matmul_coop_shared_f16_spv_words //shaders:matmul_nvcoop2_square_f16_spv_words
+bazel build //shaders:matmul_nvcoop2_square_f16_dsl_text_spv_words
 ```
 
 Run validation:
@@ -60,6 +83,25 @@ bazel run //:vk_matmul -- --shader=coop-opt --m=1024 --n=1024 --k=1024
 bazel run //:vk_matmul -- --device=0 --shader=nvcoop2 --m=1024 --n=1024 --k=1024
 ```
 
+Run the experimental text-first NV coop2 DSL path:
+
+```bash
+bazel run //:vk_matmul_dsl -- --device=0 --shader=nvcoop2-square-f16 --m=128 --n=128 --k=16
+bazel run //:vk_matmul_dsl -- --device=0 --shader=nvcoop2-square-f16 --m=1024 --n=1024 --k=1024 --iters=100 --warmup=20
+```
+
+Compare it with the opcode-emitter reference using the same runtime options:
+
+```bash
+bazel run //:vk_matmul -- --device=0 --shader=nvcoop2-square-f16 --m=1024 --n=1024 --k=1024 --iters=100 --warmup=20
+```
+
+After building the DSL target, the generated assembly text is available at:
+
+```bash
+bazel-bin/shaders/matmul_nvcoop2_square_f16_dsl_text.spvasm
+```
+
 Shader modes:
 
 - `--shader=zig`: scalar f32 path.
@@ -72,6 +114,7 @@ Shader modes:
 - `--shader=nvcoop2-f16`: NVIDIA `VK_NV_cooperative_matrix2` FP16 path with a 64x64 workgroup-scope tile.
 - `--shader=nvcoop2-wide-f16`: NVIDIA FP16 path with a 64x128 workgroup-scope tile.
 - `--shader=nvcoop2-square-f16`: NVIDIA FP16 path with a 128x128 workgroup-scope tile.
+- `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from the text-first Zig DSL pipeline.
 - `--timing=gpu` / `--timing=gpu-timestamp`: default GPU timestamp timing around a batched dispatch command buffer.
 - `--timing=submit-cpu`: legacy per-submit CPU wall-clock timing.
 - `--device=<index>`: select the Vulkan device index printed by `--list-devices`.

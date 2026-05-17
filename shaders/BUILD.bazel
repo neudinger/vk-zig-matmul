@@ -55,6 +55,60 @@ zig_library(
 )
 
 genrule(
+    name = "matmul_zig_dsl_spv",
+    srcs = [
+        "matmul_kernel.zig",
+        "//tools:patch_spv.zig",
+    ],
+    outs = ["matmul_zig_dsl.spv"],
+    cmd = """
+set -euo pipefail
+raw="$(@D)/matmul_zig_dsl.raw.spv"
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) build-obj $(location matmul_kernel.zig) \
+    -target spirv32-vulkan \
+    -mcpu=vulkan_v1_2 \
+    -fno-llvm \
+    -fno-lld \
+    -fno-entry \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -femit-bin="$$raw"
+$(ZIG_BIN) run $(location //tools:patch_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$$raw" "$@"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_zig_dsl_spv_zig",
+    srcs = [
+        ":matmul_zig_dsl_spv",
+        "//tools:patch_spv.zig",
+    ],
+    outs = ["matmul_zig_dsl_spv.zig"],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location //tools:patch_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$(location :matmul_zig_dsl_spv)" "$(@D)/matmul_zig_dsl_spv.copy.spv" "$@" "matmul_zig_dsl_spv"
+""",
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_zig_dsl_spv_words",
+    import_name = "matmul_zig_dsl_spv",
+    main = ":matmul_zig_dsl_spv_zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
     name = "matmul_coop_f16_spv_gen",
     srcs = ["//tools:emit_coop_spv.zig"],
     outs = [
@@ -105,6 +159,80 @@ zig_library(
     name = "matmul_coop_f16_opt_spv_words",
     import_name = "matmul_coop_f16_opt_spv",
     main = ":matmul_coop_f16_opt_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_coop_f16_opt_dsl_spv_gen",
+    srcs = [
+        "coop_dsl.zig",
+        "matmul_coop_f16_opt_kernel.zig",
+    ],
+    outs = [
+        "matmul_coop_f16_opt_dsl.spv",
+        "matmul_coop_f16_opt_dsl_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location matmul_coop_f16_opt_kernel.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$(@D)/matmul_coop_f16_opt_dsl.spv" "$(@D)/matmul_coop_f16_opt_dsl_spv.zig"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.3 "$(@D)/matmul_coop_f16_opt_dsl.spv"
+""",
+    tools = ["@spirv_tools//:spirv-val"],
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_coop_f16_opt_dsl_spv_words",
+    import_name = "matmul_coop_f16_opt_dsl_spv",
+    main = ":matmul_coop_f16_opt_dsl_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_coop_f16_opt_dsl_text_spv_gen",
+    srcs = [
+        "coop_dsl.zig",
+        "matmul_coop_f16_opt_kernel.zig",
+        "//tools:embed_spv.zig",
+    ],
+    outs = [
+        "matmul_coop_f16_opt_dsl_text.spv",
+        "matmul_coop_f16_opt_dsl_text.spvasm",
+        "matmul_coop_f16_opt_dsl_text_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+raw="$(@D)/matmul_coop_f16_opt_dsl_text.raw.spv"
+raw_zig="$(@D)/matmul_coop_f16_opt_dsl_text.raw.zig"
+$(ZIG_BIN) run $(location matmul_coop_f16_opt_kernel.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$$raw" "$$raw_zig"
+$(execpath @spirv_tools//:spirv-dis) "$$raw" -o "$(@D)/matmul_coop_f16_opt_dsl_text.spvasm"
+$(execpath @spirv_tools//:spirv-as) --target-env vulkan1.3 "$(@D)/matmul_coop_f16_opt_dsl_text.spvasm" -o "$(@D)/matmul_coop_f16_opt_dsl_text.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.3 "$(@D)/matmul_coop_f16_opt_dsl_text.spv"
+$(ZIG_BIN) run $(location //tools:embed_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$(@D)/matmul_coop_f16_opt_dsl_text.spv" "$(@D)/matmul_coop_f16_opt_dsl_text_spv.zig" "matmul_coop_f16_opt_dsl_spv"
+""",
+    tools = [
+        "@spirv_tools//:spirv-as",
+        "@spirv_tools//:spirv-dis",
+        "@spirv_tools//:spirv-val",
+    ],
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_coop_f16_opt_dsl_text_spv_words",
+    import_name = "matmul_coop_f16_opt_dsl_spv",
+    main = ":matmul_coop_f16_opt_dsl_text_spv.zig",
     visibility = ["//visibility:public"],
 )
 
@@ -275,6 +403,46 @@ zig_library(
     name = "matmul_nvcoop2_square_f16_spv_words",
     import_name = "matmul_nvcoop2_square_f16_spv",
     main = ":matmul_nvcoop2_square_f16_spv.zig",
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "matmul_nvcoop2_square_f16_dsl_text_spv_gen",
+    srcs = [
+        "matmul_nvcoop2_square_f16_kernel.zig",
+        "nvcoop2_dsl.zig",
+        "//tools:embed_spv.zig",
+    ],
+    outs = [
+        "matmul_nvcoop2_square_f16_dsl_text.spv",
+        "matmul_nvcoop2_square_f16_dsl_text.spvasm",
+        "matmul_nvcoop2_square_f16_dsl_text_spv.zig",
+    ],
+    cmd = """
+set -euo pipefail
+cache="$(@D)/zig-cache"
+$(ZIG_BIN) run $(location matmul_nvcoop2_square_f16_kernel.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$(@D)/matmul_nvcoop2_square_f16_dsl_text.spvasm"
+$(execpath @spirv_tools//:spirv-as) --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_square_f16_dsl_text.spvasm" -o "$(@D)/matmul_nvcoop2_square_f16_dsl_text.spv"
+$(execpath @spirv_tools//:spirv-val) --target-env vulkan1.4 "$(@D)/matmul_nvcoop2_square_f16_dsl_text.spv"
+$(ZIG_BIN) run $(location //tools:embed_spv.zig) \
+    --cache-dir "$$cache" \
+    --global-cache-dir "$$cache" \
+    -- "$(@D)/matmul_nvcoop2_square_f16_dsl_text.spv" "$(@D)/matmul_nvcoop2_square_f16_dsl_text_spv.zig" "matmul_nvcoop2_square_f16_spv"
+""",
+    tools = [
+        "@spirv_tools//:spirv-as",
+        "@spirv_tools//:spirv-val",
+    ],
+    toolchains = ["@rules_zig//zig:resolved_toolchain"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_square_f16_dsl_text_spv_words",
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    main = ":matmul_nvcoop2_square_f16_dsl_text_spv.zig",
     visibility = ["//visibility:public"],
 )
 

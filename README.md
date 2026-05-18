@@ -104,7 +104,9 @@ bazel build //shaders:matmul_coop_shared_f16_spv_words //shaders:matmul_nvcoop2_
 bazel build //shaders:matmul_nvcoop2_square_f16_dsl_text_spv_words
 bazel build //shaders:matmul_nvcoop2_square_f16_frontend_spv_words
 bazel build //shaders:matmul_nvcoop2_square_f16_slang_spv_words
+bazel build //shaders:matmul_nvcoop2_square_f16_slang_n2_f32_u4_spv_words
 bazel build //shaders:matmul_nvcoop2_square_f16_slang_spvasm //shaders:matmul_nvcoop2_square_f16_slang_spv
+bazel build //shaders:matmul_nvcoop2_square_f16_slang_n2_f32_u4_spvasm //shaders:matmul_nvcoop2_square_f16_slang_n2_f32_u4_spv
 ```
 
 Run validation:
@@ -119,6 +121,8 @@ bazel run //:vk_matmul -- --device=0 --shader=nvcoop2-f16 --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --device=0 --shader=nvcoop2 --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --device=0 --shader=coop-shared-f16 --m=64 --n=64 --k=64
 bazel run //:vk_matmul -- --device=0 --shader=nvcoop2-square-f16 --m=1024 --n=1024 --k=1024
+bazel run //:vk_matmul_slang_n2_f32_u4 -- --device=0 --shader=nvcoop2-square-f16-n2-f32-u4 --m=128 --n=256 --k=64
+bazel run //:vk_matmul_slang_n2_f32_u4 -- --device=0 --shader=nvcoop2-square-f16-n2-f32-u4 --m=512 --n=512 --k=512
 bazel run //:vk_matmul -- --shader=coop --m=1024 --n=1024 --k=1024
 bazel run //:vk_matmul -- --shader=coop-opt --m=1024 --n=1024 --k=1024
 bazel run //:vk_matmul -- --device=0 --shader=nvcoop2 --m=1024 --n=1024 --k=1024
@@ -173,9 +177,11 @@ Build and run the Slang-generated NV coop2 square-f16 path:
 
 ```bash
 bazel build //:vk_matmul_slang
+bazel build //:vk_matmul_slang_n2_f32_u4
 bazel run //:vk_matmul_slang -- --device=0 --shader=nvcoop2-square-f16 --m=128 --n=128 --k=16
 bazel run //:vk_matmul_slang -- --device=0 --shader=nvcoop2-square-f16 --m=1024 --n=1024 --k=1024 --iters=100 --warmup=20
 bazel run //:vk_matmul_slang_u4 -- --device=0 --shader=nvcoop2-square-f16 --m=4096 --n=4096 --k=4096 --iters=100 --warmup=20 --skip-validation
+bazel run //:vk_matmul_slang_n2_f32_u4 -- --device=0 --shader=nvcoop2-square-f16-n2-f32-u4 --m=4096 --n=4096 --k=4096 --iters=100 --warmup=20 --skip-validation
 ```
 
 The Slang assembly and bytecode filegroups expose:
@@ -183,7 +189,28 @@ The Slang assembly and bytecode filegroups expose:
 ```bash
 bazel-bin/shaders/matmul_nvcoop2_square_f16_slang_spv_gen.spvasm
 bazel-bin/shaders/matmul_nvcoop2_square_f16_slang_spv_gen.spv
+bazel-bin/shaders/matmul_nvcoop2_square_f16_slang_n2_f32_u4_spv_gen.spvasm
+bazel-bin/shaders/matmul_nvcoop2_square_f16_slang_n2_f32_u4_spv_gen.spv
 ```
+
+On the tested RTX 5090, the kept Slang optimization is
+`//:vk_matmul_slang_n2_f32_u4`, selected with
+`--shader=nvcoop2-square-f16-n2-f32-u4`. It computes a `128x256` output tile per
+workgroup with two `128x128` f32 accumulators and `K_UNROLL=4`, reusing each A
+tensor load across two neighboring N tiles.
+
+```text
+baseline //:vk_matmul_slang_u4 at 4096^3: about 99.26 TFLOP/s
+discarded f16-output experiment at 4096^3: median 99.1025 TFLOP/s
+kept n2-f32-u4 at 4096^3: median 153.6353 TFLOP/s
+kept n2-f32-u4 final spot check at 4096^3: 153.4384 TFLOP/s
+kept n2-f32-u4 at 8192^3: 143.3692 TFLOP/s
+baseline //:vk_matmul_slang_u4 at 8192^3: 93.2930 TFLOP/s
+```
+
+The generated `n2-f32-u4` assembly was checked for `SPV_NV_cooperative_matrix2`,
+`OpCooperativeMatrixLoadTensorNV`, `OpCooperativeMatrixStoreTensorNV`, and
+`OpCooperativeMatrixMulAddKHR`.
 
 Shader modes:
 
@@ -199,6 +226,7 @@ Shader modes:
 - `--shader=nvcoop2-square-f16`: NVIDIA FP16 path with a 128x128 workgroup-scope tile.
 - `//:vk_matmul_slang -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from Bazel-pinned Slang.
 - `//:vk_matmul_slang_u2`, `//:vk_matmul_slang_u4`, `//:vk_matmul_slang_u8`: Slang variants that compile the same shader with K-loop unroll factors 2, 4, and 8.
+- `//:vk_matmul_slang_n2_f32_u4 -- --shader=nvcoop2-square-f16-n2-f32-u4`: Slang variant that computes a 128x256 output tile per workgroup with two f32 accumulators and K-loop unroll factor 4.
 - `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from the text-first Zig DSL pipeline.
 - `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16-frontend`: same runtime mode, but the shader module comes from the restricted Zig-shaped frontend pipeline.
 - `--timing=gpu` / `--timing=gpu-timestamp`: default GPU timestamp timing around a batched dispatch command buffer.
@@ -215,7 +243,9 @@ The `nvcoop2*` modes additionally require an NVIDIA device advertising
 `VK_NV_cooperative_matrix2`, workgroup-scope cooperative matrices, flexible
 dimensions, tensor addressing, and block loads. They require `m % 64 == 0`,
 `n % 64 == 0`, and `k % 16 == 0` for the 64x64 mode; wider modes require
-their tile dimensions.
+their tile dimensions. In particular, `nvcoop2-square-f16` requires
+`m % 128 == 0` and `n % 128 == 0`, while
+`nvcoop2-square-f16-n2-f32-u4` requires `m % 128 == 0` and `n % 256 == 0`.
 
 The current shader source avoids three Zig SPIR-V backend limitations:
 

@@ -60,6 +60,21 @@ for now. It is selected separately with
 `--shader=nvcoop2-square-f16-frontend`, so the existing working
 `--shader=nvcoop2-square-f16` path remains available for comparison.
 
+The `//:vk_matmul_slang` binary keeps the same host/runtime code as
+`//:vk_matmul`, but swaps the `nvcoop2-square-f16` shader module for a
+Bazel-pinned Slang build:
+
+```text
+shaders/matmul_nvcoop2_square_f16.slang
+  -> pinned Slang slangc
+  -> generated .spvasm text
+  -> Bazel-pinned spirv-as
+  -> .spv binary
+  -> tools/validate_embed_spv with Bazel-pinned spirv-val
+  -> embedded Zig words
+  -> Vulkan shader module
+```
+
 Build:
 
 ```bash
@@ -88,6 +103,8 @@ bazel build //shaders:matmul_nvcoop2_bf16_spv_words //shaders:matmul_nvcoop2_f16
 bazel build //shaders:matmul_coop_shared_f16_spv_words //shaders:matmul_nvcoop2_square_f16_spv_words
 bazel build //shaders:matmul_nvcoop2_square_f16_dsl_text_spv_words
 bazel build //shaders:matmul_nvcoop2_square_f16_frontend_spv_words
+bazel build //shaders:matmul_nvcoop2_square_f16_slang_spv_words
+bazel build //shaders:matmul_nvcoop2_square_f16_slang_spvasm //shaders:matmul_nvcoop2_square_f16_slang_spv
 ```
 
 Run validation:
@@ -152,6 +169,21 @@ frontend: TFLOP/s=94.3707
 existing DSL: TFLOP/s=94.2712
 ```
 
+Build and run the Slang-generated NV coop2 square-f16 path:
+
+```bash
+bazel build //:vk_matmul_slang
+bazel run //:vk_matmul_slang -- --device=0 --shader=nvcoop2-square-f16 --m=128 --n=128 --k=16
+bazel run //:vk_matmul_slang -- --device=0 --shader=nvcoop2-square-f16 --m=1024 --n=1024 --k=1024 --iters=100 --warmup=20
+```
+
+The Slang assembly and bytecode filegroups expose:
+
+```bash
+bazel-bin/shaders/matmul_nvcoop2_square_f16_slang_spv_gen.spvasm
+bazel-bin/shaders/matmul_nvcoop2_square_f16_slang_spv_gen.spv
+```
+
 Shader modes:
 
 - `--shader=zig`: scalar f32 path.
@@ -164,6 +196,7 @@ Shader modes:
 - `--shader=nvcoop2-f16`: NVIDIA `VK_NV_cooperative_matrix2` FP16 path with a 64x64 workgroup-scope tile.
 - `--shader=nvcoop2-wide-f16`: NVIDIA FP16 path with a 64x128 workgroup-scope tile.
 - `--shader=nvcoop2-square-f16`: NVIDIA FP16 path with a 128x128 workgroup-scope tile.
+- `//:vk_matmul_slang -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from Bazel-pinned Slang.
 - `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from the text-first Zig DSL pipeline.
 - `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16-frontend`: same runtime mode, but the shader module comes from the restricted Zig-shaped frontend pipeline.
 - `--timing=gpu` / `--timing=gpu-timestamp`: default GPU timestamp timing around a batched dispatch command buffer.

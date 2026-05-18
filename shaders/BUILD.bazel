@@ -414,6 +414,30 @@ slang_shader_spv_words(
     target_env = "vulkan1.4",
 )
 
+slang_shader_spv_words(
+    name = "matmul_nvcoop2_square_f16_slang_u2_spv_gen",
+    src = "matmul_nvcoop2_square_f16.slang",
+    defines = ["K_UNROLL=2"],
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    target_env = "vulkan1.4",
+)
+
+slang_shader_spv_words(
+    name = "matmul_nvcoop2_square_f16_slang_u4_spv_gen",
+    src = "matmul_nvcoop2_square_f16.slang",
+    defines = ["K_UNROLL=4"],
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    target_env = "vulkan1.4",
+)
+
+slang_shader_spv_words(
+    name = "matmul_nvcoop2_square_f16_slang_u8_spv_gen",
+    src = "matmul_nvcoop2_square_f16.slang",
+    defines = ["K_UNROLL=8"],
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    target_env = "vulkan1.4",
+)
+
 filegroup(
     name = "matmul_nvcoop2_square_f16_slang_spvasm",
     srcs = [":matmul_nvcoop2_square_f16_slang_spv_gen"],
@@ -430,6 +454,27 @@ zig_library(
     name = "matmul_nvcoop2_square_f16_slang_spv_words",
     import_name = "matmul_nvcoop2_square_f16_spv",
     main = ":matmul_nvcoop2_square_f16_slang_spv_gen",
+    visibility = ["//visibility:public"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_square_f16_slang_u2_spv_words",
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    main = ":matmul_nvcoop2_square_f16_slang_u2_spv_gen",
+    visibility = ["//visibility:public"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_square_f16_slang_u4_spv_words",
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    main = ":matmul_nvcoop2_square_f16_slang_u4_spv_gen",
+    visibility = ["//visibility:public"],
+)
+
+zig_library(
+    name = "matmul_nvcoop2_square_f16_slang_u8_spv_words",
+    import_name = "matmul_nvcoop2_square_f16_spv",
+    main = ":matmul_nvcoop2_square_f16_slang_u8_spv_gen",
     visibility = ["//visibility:public"],
 )
 

@@ -175,6 +175,7 @@ Build and run the Slang-generated NV coop2 square-f16 path:
 bazel build //:vk_matmul_slang
 bazel run //:vk_matmul_slang -- --device=0 --shader=nvcoop2-square-f16 --m=128 --n=128 --k=16
 bazel run //:vk_matmul_slang -- --device=0 --shader=nvcoop2-square-f16 --m=1024 --n=1024 --k=1024 --iters=100 --warmup=20
+bazel run //:vk_matmul_slang_u4 -- --device=0 --shader=nvcoop2-square-f16 --m=4096 --n=4096 --k=4096 --iters=100 --warmup=20 --skip-validation
 ```
 
 The Slang assembly and bytecode filegroups expose:
@@ -197,10 +198,12 @@ Shader modes:
 - `--shader=nvcoop2-wide-f16`: NVIDIA FP16 path with a 64x128 workgroup-scope tile.
 - `--shader=nvcoop2-square-f16`: NVIDIA FP16 path with a 128x128 workgroup-scope tile.
 - `//:vk_matmul_slang -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from Bazel-pinned Slang.
+- `//:vk_matmul_slang_u2`, `//:vk_matmul_slang_u4`, `//:vk_matmul_slang_u8`: Slang variants that compile the same shader with K-loop unroll factors 2, 4, and 8.
 - `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16`: same runtime mode, but the shader module comes from the text-first Zig DSL pipeline.
 - `//:vk_matmul_dsl -- --shader=nvcoop2-square-f16-frontend`: same runtime mode, but the shader module comes from the restricted Zig-shaped frontend pipeline.
 - `--timing=gpu` / `--timing=gpu-timestamp`: default GPU timestamp timing around a batched dispatch command buffer.
 - `--timing=submit-cpu`: legacy per-submit CPU wall-clock timing.
+- `--skip-validation`: skip output download and CPU result checking for large benchmark-only runs.
 - `--device=<index>`: select the Vulkan device index printed by `--list-devices`.
 - `--device-substr=<text>`: select the first non-CPU Vulkan device whose name contains the text.
 

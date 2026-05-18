@@ -103,6 +103,8 @@ def _slang_shader_spv_words_impl(ctx):
 
     slang_args = ctx.actions.args()
     slang_args.add(ctx.file.src)
+    for define in ctx.attr.defines:
+        slang_args.add("-D" + define)
     slang_args.add("-target")
     slang_args.add("spirv-asm")
     slang_args.add("-entry")
@@ -190,6 +192,7 @@ slang_shader_spv_words = rule(
         "entry": attr.string(default = "main"),
         "stage": attr.string(default = "compute"),
         "capabilities": attr.string(default = "cooperative_matrix_tensor_addressing+tensor_addressing+cooperative_matrix_2"),
+        "defines": attr.string_list(),
         "optimization": attr.string(default = "-O3"),
         "target_env": attr.string(default = "vulkan1.4"),
         "import_name": attr.string(mandatory = True),

@@ -127,6 +127,7 @@ const Options = struct {
     iters: usize = 50,
     warmup: usize = 5,
     timing: TimingMode = .gpu_timestamp,
+    skip_validation: bool = false,
     list_devices: bool = false,
     device_index: ?usize = null,
     device_substr: ?[]const u8 = null,
@@ -215,6 +216,8 @@ fn parseArgs(args: []const []const u8) !Options {
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--list-devices")) {
             opts.list_devices = true;
+        } else if (std.mem.eql(u8, arg, "--skip-validation")) {
+            opts.skip_validation = true;
         } else if (std.mem.startsWith(u8, arg, "--shader=")) {
             const value = arg["--shader=".len..];
             if (std.mem.eql(u8, value, "zig")) {
@@ -751,7 +754,7 @@ fn runScalarMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
 
     const timing = try timeDispatches(vk, device, command_buffer, timed_cmd, query_pool, fence, opts);
 
-    try validate(out_values, a_values, b_values, opts.m, opts.n, opts.k);
+    if (!opts.skip_validation) try validate(out_values, a_values, b_values, opts.m, opts.n, opts.k);
     printResult(opts, timing);
 }
 
@@ -812,16 +815,16 @@ fn runCoopMatmul(vk: *Vulkan, device: *Device, opts: Options) !void {
     if (opts.timing == .gpu_timestamp) query_pool = try createTimestampQueryPool(device);
     defer if (query_pool != .null_handle) device.fns.dispatch.vkDestroyQueryPool.?(device.handle, query_pool, null);
     if (opts.timing == .gpu_timestamp) try recordTimedCommands(device, timed_cmd, pipeline, pipeline_layout, descriptor_set, opts, query_pool);
-    try recordDownloadCommands(device, download_cmd, out_dev, out_stage);
+    if (!opts.skip_validation) try recordDownloadCommands(device, download_cmd, out_dev, out_stage);
 
     const fence = try createFence(device);
     defer device.fns.dispatch.vkDestroyFence.?(device.handle, fence, null);
 
     try submitCommand(device, upload_cmd, fence);
     const timing = try timeDispatches(vk, device, compute_cmd, timed_cmd, query_pool, fence, opts);
-    try submitCommand(device, download_cmd, fence);
+    if (!opts.skip_validation) try submitCommand(device, download_cmd, fence);
 
-    try validateEncoded(out_values, opts);
+    if (!opts.skip_validation) try validateEncoded(out_values, opts);
     printResult(opts, timing);
 }
 
@@ -1225,8 +1228,10 @@ fn submitCommand(device: *Device, command_buffer: zvk.CommandBuffer, fence: zvk.
 fn printResult(opts: Options, timing: TimingResult) void {
     const ops: f64 = 2.0 * @as(f64, @floatFromInt(opts.m)) * @as(f64, @floatFromInt(opts.n)) * @as(f64, @floatFromInt(opts.k));
     const tflops = ops / timing.avg_ns / 1.0e3;
+    const status = if (opts.skip_validation) "benchmark complete" else "validation passed";
     if (timing.avg_gpu_ns) |avg_gpu_ns| {
-        std.debug.print("validation passed: shader={s} m={d} n={d} k={d} avg_gpu_ns={d:.2} avg_batch_cpu_ns={d:.2} TFLOP/s={d:.4}\n", .{
+        std.debug.print("{s}: shader={s} m={d} n={d} k={d} avg_gpu_ns={d:.2} avg_batch_cpu_ns={d:.2} TFLOP/s={d:.4}\n", .{
+            status,
             opts.shader.name(),
             opts.m,
             opts.n,
@@ -1236,7 +1241,8 @@ fn printResult(opts: Options, timing: TimingResult) void {
             tflops,
         });
     } else {
-        std.debug.print("validation passed: shader={s} m={d} n={d} k={d} avg_ns={d:.2} TFLOP/s={d:.4}\n", .{
+        std.debug.print("{s}: shader={s} m={d} n={d} k={d} avg_ns={d:.2} TFLOP/s={d:.4}\n", .{
+            status,
             opts.shader.name(),
             opts.m,
             opts.n,
